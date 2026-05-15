@@ -182,7 +182,7 @@ const w1Bass: PulseNote[] = [
 
 const w1Drums: NoisePart = {
   // 8-beat country shuffle: kick on 1+3, snare backbeat on 2+4, hats triplet feel.
-  pattern: 'k-h-s-hhk-h-s-hh-k-hcs-h-k-h-s-hh-',
+  pattern: 'k-h-s-hhk-h-s-hhk-h-s-hhk-hcs-h-',
   stepsPerBeat: 4,
 };
 
@@ -240,7 +240,7 @@ const w2Bass: PulseNote[] = [
 const w2Drums: NoisePart = {
   // Slow tribal hand-drum feel: tom + soft kick + occasional clap.
   // 32 sixteenths over 2 bars; repeats 4x.
-  pattern: 'k--t--h-k-h--t--k--t-c-h-k--t--h-',
+  pattern: 'k--t--h-k-h--t--k--t-c-h-k-t--h-',
   stepsPerBeat: 4,
 };
 
@@ -437,7 +437,7 @@ const w5Bass: PulseNote[] = [
 const w5Drums: NoisePart = {
   // Heavy double-kick metal beat with snare backbeat.
   // 16 steps = 4 beats = 1 bar; repeats 8x across loop.
-  pattern: 'k-khs-h-k-khs-hkh',
+  pattern: 'k-h-s-h-k-khs-h-',
   stepsPerBeat: 4,
 };
 
@@ -500,7 +500,7 @@ const w6Bass: PulseNote[] = [
 const w6Drums: NoisePart = {
   // Epic ride with big snare backbeat and double-kicks at the close.
   // 16 steps = 4 beats = 1 bar; repeats 8x.
-  pattern: 'k-o-s-o-k-k-s-okk',
+  pattern: 'k-o-s-o-k-ks-okk',
   stepsPerBeat: 4,
 };
 
