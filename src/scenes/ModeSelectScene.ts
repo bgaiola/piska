@@ -18,8 +18,9 @@ import Phaser from 'phaser';
 import { BGMPlayer } from '@/audio';
 import { t, i18n } from '@/i18n';
 import type { AIDifficulty } from '@/engine/AIPlayer';
+import { PUZZLES } from '@/data/puzzles';
 
-type MenuMode = 'main' | 'vs-difficulty';
+type MenuMode = 'main' | 'vs-difficulty' | 'puzzle-picker';
 
 interface CardSpec {
   key: string;
@@ -46,8 +47,15 @@ const MAIN_CARDS: CardSpec[] = [
   { key: 'vs-online', labelKey: 'modeselect.vsonline.label', subtitleKey: 'modeselect.vsonline.subtitle' },
   { key: 'time-attack', labelKey: 'modeselect.timeattack.label', subtitleKey: 'modeselect.timeattack.subtitle' },
   { key: 'stage-clear', labelKey: 'modeselect.stageclear.label', subtitleKey: 'modeselect.stageclear.subtitle' },
-  { key: 'puzzle', labelKey: 'modeselect.puzzle.label', subtitleKey: 'modeselect.puzzle.subtitle', disabled: true },
+  { key: 'puzzle', labelKey: 'modeselect.puzzle.label', subtitleKey: 'modeselect.puzzle.subtitle' },
 ];
+
+const PUZZLE_CARDS: Array<CardSpec & { puzzleId: string }> = PUZZLES.map((p) => ({
+  key: `puzzle-${p.id}`,
+  puzzleId: p.id,
+  labelKey: `puzzle.${p.id}.label`,
+  subtitleKey: `puzzle.${p.id}.subtitle`,
+}));
 
 const DIFFICULTY_CARDS: Array<CardSpec & { difficulty: AIDifficulty }> = [
   { key: 'easy', difficulty: 'easy', labelKey: 'difficulty.easy.label', subtitleKey: 'difficulty.easy.subtitle' },
@@ -109,7 +117,11 @@ export class ModeSelectScene extends Phaser.Scene {
     }
 
     const heading =
-      this.mode === 'main' ? t('modeselect.heading.main') : t('modeselect.heading.difficulty');
+      this.mode === 'main'
+        ? t('modeselect.heading.main')
+        : this.mode === 'vs-difficulty'
+          ? t('modeselect.heading.difficulty')
+          : t('modeselect.heading.puzzle');
 
     const titleY = h < 420 ? 18 : 28;
     this.titleText = this.add
@@ -127,7 +139,11 @@ export class ModeSelectScene extends Phaser.Scene {
     }
 
     const cards: CardSpec[] =
-      this.mode === 'main' ? MAIN_CARDS : DIFFICULTY_CARDS;
+      this.mode === 'main'
+        ? MAIN_CARDS
+        : this.mode === 'vs-difficulty'
+          ? DIFFICULTY_CARDS
+          : PUZZLE_CARDS;
 
     // Decide layout: vertical (1 col) in portrait, grid in landscape.
     const headerArea = titleY + 16;
@@ -161,7 +177,11 @@ export class ModeSelectScene extends Phaser.Scene {
     });
 
     const hint =
-      this.mode === 'main' ? t('modeselect.hint.main') : t('modeselect.hint.difficulty');
+      this.mode === 'main'
+        ? t('modeselect.hint.main')
+        : this.mode === 'vs-difficulty'
+          ? t('modeselect.hint.difficulty')
+          : t('modeselect.hint.puzzle');
 
     this.hintText = this.add
       .text(w / 2, h - 12, hint, {
@@ -426,10 +446,23 @@ export class ModeSelectScene extends Phaser.Scene {
         case 'stage-clear':
           this.scene.start('GameScene', { mode: 'stage-clear' });
           break;
+        case 'puzzle':
+          this.mode = 'puzzle-picker';
+          this.cursor = 0;
+          this.drawScreen();
+          break;
         default:
           this.shakeCard(card);
           break;
       }
+      return;
+    }
+
+    if (this.mode === 'puzzle-picker') {
+      const card = this.cardObjects[this.cursor];
+      if (!card) return;
+      const spec = card.getData('spec') as CardSpec & { puzzleId: string };
+      this.scene.start('GameScene', { mode: 'puzzle', puzzleId: spec.puzzleId });
       return;
     }
 
@@ -443,7 +476,13 @@ export class ModeSelectScene extends Phaser.Scene {
   private back(): void {
     if (this.mode === 'vs-difficulty') {
       this.mode = 'main';
-      this.cursor = 1; // Vs IA card index.
+      this.cursor = 2;
+      this.drawScreen();
+      return;
+    }
+    if (this.mode === 'puzzle-picker') {
+      this.mode = 'main';
+      this.cursor = 7;
       this.drawScreen();
       return;
     }

@@ -23,9 +23,25 @@ export interface NoteOn {
   durationMs: number;
   /** Note velocity (0..1). Defaults to 1. */
   velocity?: number;
+  /**
+   * Optional starting frequency for a pitch slide. If set, the oscillator
+   * begins at slideFromFreq and ramps exponentially to `freq` over
+   * `slideMs` (default = first quarter of durationMs, capped at 90 ms).
+   * Use this for desert slither motifs, water bubbles, etc.
+   */
+  slideFromFreq?: number;
+  /** Slide duration in ms. Only used if slideFromFreq is provided. */
+  slideMs?: number;
+  /**
+   * Optional vibrato applied after the slide finishes. Depth is in cents
+   * (100 cents = 1 semitone) and rate is in Hz. Vibrato is implemented as
+   * a low-frequency oscillator modulating the carrier frequency.
+   */
+  vibratoCents?: number;
+  vibratoRateHz?: number;
 }
 
-export type NoiseKind = 'kick' | 'snare' | 'hat';
+export type NoiseKind = 'kick' | 'snare' | 'hat' | 'openhat' | 'tom' | 'clap';
 
 /** Minimum gain we may ramp to (exponentialRampToValueAtTime cannot reach 0). */
 const MIN_GAIN = 0.0001;
@@ -129,7 +145,7 @@ export class ChiptuneSynth {
 
     const osc = this.ctx.createOscillator();
     osc.setPeriodicWave(wave);
-    osc.frequency.setValueAtTime(note.freq, startAt);
+    this.applyPitch(osc.frequency, startAt, note);
 
     const envelope = this.ctx.createGain();
     envelope.gain.value = 0;
@@ -144,10 +160,15 @@ export class ChiptuneSynth {
     const stopAt = startAt + (note.durationMs + 50) / 1000;
     osc.start(startAt);
     osc.stop(stopAt);
+    const lfo = this.applyVibrato(osc.frequency, note, startAt, stopAt);
     osc.onended = () => {
       try {
         osc.disconnect();
         envelope.disconnect();
+        if (lfo) {
+          lfo.osc.disconnect();
+          lfo.depth.disconnect();
+        }
       } catch {
         // Already disconnected — ignore.
       }
@@ -162,7 +183,7 @@ export class ChiptuneSynth {
     const startAt = atTime ?? this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(note.freq, startAt);
+    this.applyPitch(osc.frequency, startAt, note);
 
     const envelope = this.ctx.createGain();
     envelope.gain.value = 0;
@@ -178,10 +199,15 @@ export class ChiptuneSynth {
     const stopAt = startAt + (note.durationMs + 70) / 1000;
     osc.start(startAt);
     osc.stop(stopAt);
+    const lfo = this.applyVibrato(osc.frequency, note, startAt, stopAt);
     osc.onended = () => {
       try {
         osc.disconnect();
         envelope.disconnect();
+        if (lfo) {
+          lfo.osc.disconnect();
+          lfo.depth.disconnect();
+        }
       } catch {
         // Already disconnected — ignore.
       }
@@ -223,6 +249,30 @@ export class ChiptuneSynth {
         filter.Q.value = 0.8;
         decayMs = Math.max(durationMs, 35);
         peak = 0.55;
+        break;
+      case 'openhat':
+        // Like a hat but longer-lived for shuffle / ride feel.
+        filter.type = 'highpass';
+        filter.frequency.value = 5500;
+        filter.Q.value = 0.6;
+        decayMs = Math.max(durationMs, 180);
+        peak = 0.45;
+        break;
+      case 'tom':
+        // Pitched low-mid hit — great for tribal / desert / castle accents.
+        filter.type = 'lowpass';
+        filter.frequency.value = 380;
+        filter.Q.value = 4;
+        decayMs = Math.max(durationMs, 130);
+        peak = 0.85;
+        break;
+      case 'clap':
+        // Quick narrow-band burst — synth-clap flavor for funkier patterns.
+        filter.type = 'bandpass';
+        filter.frequency.value = 1100;
+        filter.Q.value = 2.5;
+        decayMs = Math.max(durationMs, 70);
+        peak = 0.7;
         break;
     }
 
@@ -324,6 +374,59 @@ export class ChiptuneSynth {
       data[i] = Math.random() * 2 - 1;
     }
     return buf;
+  }
+
+  /**
+   * Apply pitch + optional slide to an oscillator's frequency AudioParam.
+   * If `slideFromFreq` is set on the note, ramps exponentially from the start
+   * pitch to the target over `slideMs`. Both endpoints are guarded against
+   * non-positive values (exponentialRampToValueAtTime requires > 0).
+   */
+  private applyPitch(freqParam: AudioParam, startAt: number, note: NoteOn): void {
+    if (note.slideFromFreq && note.slideFromFreq > 0) {
+      const slideEnd = startAt + (note.slideMs ?? Math.min(90, note.durationMs * 0.25)) / 1000;
+      freqParam.setValueAtTime(note.slideFromFreq, startAt);
+      freqParam.exponentialRampToValueAtTime(Math.max(0.0001, note.freq), slideEnd);
+    } else {
+      freqParam.setValueAtTime(note.freq, startAt);
+    }
+  }
+
+  /**
+   * If the note has vibratoCents > 0, attach a sine LFO that modulates the
+   * carrier frequency. Returns the created nodes so the caller can disconnect
+   * them when the carrier ends. The vibrato fades in over ~80 ms so the start
+   * of the note still feels solid.
+   */
+  private applyVibrato(
+    freqParam: AudioParam,
+    note: NoteOn,
+    startAt: number,
+    stopAt: number
+  ): { osc: OscillatorNode; depth: GainNode } | null {
+    const cents = note.vibratoCents ?? 0;
+    if (cents <= 0) return null;
+    const rateHz = Math.max(0.1, note.vibratoRateHz ?? 5.5);
+    // Convert cents to a Hz deviation around the carrier. We approximate
+    // depth as carrier * (2^(cents/1200) - 1), which is exact at the carrier.
+    const ratio = Math.pow(2, cents / 1200) - 1;
+    const depthHz = Math.max(0.01, note.freq * ratio);
+
+    const lfo = this.ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = rateHz;
+
+    const depthGain = this.ctx.createGain();
+    // Fade depth in to avoid an abrupt wobble at note start.
+    const fadeInEnd = Math.min(stopAt, startAt + 0.08);
+    depthGain.gain.setValueAtTime(0, startAt);
+    depthGain.gain.linearRampToValueAtTime(depthHz, fadeInEnd);
+
+    lfo.connect(depthGain);
+    depthGain.connect(freqParam);
+    lfo.start(startAt);
+    lfo.stop(stopAt);
+    return { osc: lfo, depth: depthGain };
   }
 
   /**

@@ -48,6 +48,7 @@ import {
 import { ChainPopup } from '@/ui/ChainPopup';
 import { spawnClearBurst } from '@/engine/ParticleFX';
 import { getStageById, computeStarsForStage } from '@/data/stages';
+import { getPuzzleById, PUZZLES, type PuzzleDef } from '@/data/puzzles';
 import { haptic, HAPTIC } from '@/utils/haptics';
 
 interface GameSceneInit {
@@ -65,6 +66,8 @@ interface GameSceneInit {
   /** When set, GameScene is running inside the Adventure flow and will
    *  route the result to StageOutroScene instead of ResultScene. */
   adventureStageId?: string;
+  /** When set in puzzle mode, picks the specific hand-authored layout. */
+  puzzleId?: string;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -240,61 +243,43 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * One hand-crafted starter puzzle. Designed to be solvable in ~3 swaps:
-   * - bottom row has two color clusters that align into vertical/horizontal
-   *   matches with one or two swaps.
-   *
-   * Layout (8 rows × 6 cols, top empty):
-   *
-   *   . . . . . .
-   *   . . . . . .
-   *   . . . . . .
-   *   . . . . . .
-   *   . . . . . .
-   *   . R . . . .
-   *   B R . . G G
-   *   B R B G B G
-   *
-   * Optimal solution clears all blocks in 3 swaps.
+   * Load a hand-authored puzzle into the engine grid. Falls back to the
+   * first catalog entry when no explicit id is provided so older callers
+   * continue to work.
    */
   private seedPuzzleLayout(): void {
+    const def = this.resolvePuzzleDef();
     const g = this.engine.grid;
-    // Clear the entire grid first.
     for (let r = 0; r < g.rows; r++) {
       for (let c = 0; c < g.cols; c++) {
         g.cells[r][c] = null;
       }
     }
-    const place = (row: number, col: number, color: BlockColor): void => {
-      g.cells[row][col] = {
-        id: -(row * g.cols + col + 1),
-        color,
-        kind: 'color',
-        state: 'idle',
-        swapTimer: 0,
-        clearTimer: 0,
-        fallTimer: 0,
-        swapDir: 0,
-      };
-    };
-    const last = g.rows - 1; // 7
-    const penultimate = g.rows - 2; // 6
-    const above = g.rows - 3; // 5
+    for (let r = 0; r < g.rows; r++) {
+      const sourceRow = def.rows[r];
+      if (!sourceRow) continue;
+      for (let c = 0; c < g.cols; c++) {
+        const color = sourceRow[c];
+        if (!color) continue;
+        g.cells[r][c] = {
+          id: -(r * g.cols + c + 1),
+          color,
+          kind: 'color',
+          state: 'idle',
+          swapTimer: 0,
+          clearTimer: 0,
+          fallTimer: 0,
+          swapDir: 0,
+        };
+      }
+    }
+  }
 
-    // Bottom row.
-    place(last, 0, 'blue');
-    place(last, 1, 'red');
-    place(last, 2, 'blue');
-    place(last, 3, 'green');
-    place(last, 4, 'blue');
-    place(last, 5, 'green');
-    // Row above bottom.
-    place(penultimate, 0, 'blue');
-    place(penultimate, 1, 'red');
-    place(penultimate, 4, 'green');
-    place(penultimate, 5, 'green');
-    // Two rows above bottom.
-    place(above, 1, 'red');
+  private resolvePuzzleDef(): PuzzleDef {
+    const explicit = this.modeInit.puzzleId
+      ? getPuzzleById(this.modeInit.puzzleId)
+      : undefined;
+    return explicit ?? PUZZLES[0];
   }
 
   private buildMode(): ModeBase {
@@ -309,10 +294,12 @@ export class GameScene extends Phaser.Scene {
           targetLine: this.modeInit.targetLine ?? this.engine.cfg.rows - 2,
           timeLimitMs: this.modeInit.timeLimitMs,
         });
-      case 'puzzle':
+      case 'puzzle': {
+        const def = this.resolvePuzzleDef();
         return new PuzzleMode(this.engine, {
-          movesAllowed: this.modeInit.movesAllowed ?? 5,
+          movesAllowed: this.modeInit.movesAllowed ?? def.movesAllowed,
         });
+      }
       case 'endless':
       case 'vs-ai':
       default:

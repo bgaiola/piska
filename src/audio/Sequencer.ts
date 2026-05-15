@@ -21,6 +21,17 @@ export interface PulseNote {
   lengthBeats: number;
   /** Optional per-note velocity override (0..1). */
   velocity?: number;
+  /**
+   * Optional pitch slide: ramp into `pitch` from `slideFrom` over `slideMs`.
+   * Use for swooping intros, glissandi, ocarina-like phrases.
+   */
+  slideFrom?: Pitch;
+  slideMs?: number;
+  /**
+   * Optional vibrato (depth in cents, rate in Hz). Applied after the slide.
+   */
+  vibratoCents?: number;
+  vibratoRateHz?: number;
 }
 
 export interface PulsePart {
@@ -36,7 +47,8 @@ export interface TriPart {
 export interface NoisePart {
   /**
    * Pattern as a string. Each character is one step. '-' = rest,
-   * 'k' = kick, 's' = snare, 'h' = hat. Example: 'k-h-s-h-k-h-s-h'.
+   * 'k' = kick, 's' = snare, 'h' = closed hat, 'o' = open hat (long),
+   * 't' = tom (pitched low-mid), 'c' = clap. Example: 'k-h-s-h-k-h-s-h'.
    */
   pattern: string;
   /** Steps per beat. 4 = sixteenths, 2 = eighths. */
@@ -286,18 +298,23 @@ export class Sequencer {
 
       if (note.pitch !== 'rest') {
         const freq = noteFreq(note.pitch);
+        const slideFromFreq =
+          note.slideFrom !== undefined && note.slideFrom !== 'rest'
+            ? noteFreq(note.slideFrom)
+            : undefined;
+        const noteOn = {
+          freq,
+          durationMs: sustainMs,
+          velocity: note.velocity ?? 0.9,
+          slideFromFreq,
+          slideMs: note.slideMs,
+          vibratoCents: note.vibratoCents,
+          vibratoRateHz: note.vibratoRateHz,
+        };
         if (kind === 'pulse') {
-          this.synth.playPulse(
-            part.channel,
-            { freq, durationMs: sustainMs, velocity: note.velocity ?? 0.9 },
-            part.duty,
-            time
-          );
+          this.synth.playPulse(part.channel, noteOn, part.duty, time);
         } else {
-          this.synth.playTriangle(
-            { freq, durationMs: sustainMs, velocity: note.velocity ?? 0.9 },
-            time
-          );
+          this.synth.playTriangle(noteOn, time);
         }
       }
 
@@ -329,6 +346,9 @@ export class Sequencer {
       if (ch === 'k') this.synth.playNoise('kick', 80, time);
       else if (ch === 's') this.synth.playNoise('snare', 110, time);
       else if (ch === 'h') this.synth.playNoise('hat', 40, time);
+      else if (ch === 'o') this.synth.playNoise('openhat', 180, time);
+      else if (ch === 't') this.synth.playNoise('tom', 130, time);
+      else if (ch === 'c') this.synth.playNoise('clap', 70, time);
 
       cursor.beatPos += stepBeats;
       cursor.stepIdx = (cursor.stepIdx + 1) % part.pattern.length;
