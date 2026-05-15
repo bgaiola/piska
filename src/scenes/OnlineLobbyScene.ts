@@ -528,6 +528,19 @@ export class OnlineLobbyScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   private relayout(): void {
+    // On Android, opening the virtual keyboard shrinks window.innerHeight,
+    // which fires resize → layout-changed. If we redraw the joining step
+    // we destroy and recreate the focused <input>, which dismisses the
+    // keyboard, which fires another resize, and the user sees the
+    // keyboard "going crazy". Skip the redraw while typing; the input
+    // anchor is positioned in % so it remains usable without it.
+    if (
+      this.step === 'joining' &&
+      this.codeInput &&
+      document.activeElement === this.codeInput
+    ) {
+      return;
+    }
     switch (this.step) {
       case 'menu':
         this.drawMenu();
