@@ -99,12 +99,12 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    // Visible state: pressed colour on press; idle colour otherwise. We don't
+    // tween or chain anything here — the click handler must do as little as
+    // possible before scene.start() so a malformed effect can't strand the
+    // player on this screen.
     btnBg.setInteractive({ useHandCursor: true });
-    btnBg.on('pointerdown', () => {
-      btnBg.setFillStyle(BTN_FILL_PRESSED, 1);
-      this.tweens.add({ targets: [btnBg, btnLabel], scale: 0.96, duration: 80, yoyo: true });
-      this.start();
-    });
+    btnBg.on('pointerdown', () => this.start());
     btnBg.on('pointerover', () => btnBg.setFillStyle(BTN_FILL_PRESSED, 1));
     btnBg.on('pointerout', () => btnBg.setFillStyle(BTN_FILL_IDLE, 1));
 
@@ -139,10 +139,18 @@ export class TitleScene extends Phaser.Scene {
   private start(): void {
     if (this.started) return;
     this.started = true;
-    const bgm = BGMPlayer.get();
-    bgm
-      .unlock()
-      .finally(() => this.scene.start('ModeSelectScene'));
+    // Fire-and-forget audio unlock. On iOS Safari the resume() promise can
+    // stall silently when called outside the actual gesture context (e.g.
+    // when chained behind a tween), which used to leave the player stranded
+    // on the title screen. Navigation must not depend on audio.
+    try {
+      BGMPlayer.get()
+        .unlock()
+        .catch(() => {});
+    } catch {
+      /* ignore — BGM is non-critical */
+    }
+    this.scene.start('ModeSelectScene');
   }
 
   private destroyObjects(): void {
