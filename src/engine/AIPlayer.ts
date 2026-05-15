@@ -45,22 +45,25 @@ export const AI_PROFILES: Record<AIDifficulty, AIDifficultyProfile> = {
     chainSearchDepth: 1,
   },
   hard: {
-    actionDelayMsMin: 200,
-    actionDelayMsMax: 400,
-    candidateLimit: 24,
-    mistakeRate: 0.05,
-    chainSetupRate: 0.75,
+    actionDelayMsMin: 130,
+    actionDelayMsMax: 280,
+    candidateLimit: 32,
+    mistakeRate: 0.03,
+    chainSetupRate: 0.9,
     usesPressure: true,
-    chainSearchDepth: 2,
+    chainSearchDepth: 3,
   },
   master: {
-    actionDelayMsMin: 100,
-    actionDelayMsMax: 250,
-    candidateLimit: 48,
+    // Mestre plays at near-superhuman pace: ~10 actions/second, looking 4
+    // cascade steps deep, never makes a mistake, and aggressively pushes
+    // the player by holding raise whenever the board has any breathing room.
+    actionDelayMsMin: 55,
+    actionDelayMsMax: 130,
+    candidateLimit: 96,
     mistakeRate: 0.0,
     chainSetupRate: 1.0,
     usesPressure: true,
-    chainSearchDepth: 3,
+    chainSearchDepth: 5,
   },
 };
 
@@ -217,9 +220,11 @@ export class AIPlayer {
   private updatePressure(): void {
     const rows = this.engine.cfg.rows;
     const topMostRow = this.topmostNonEmptyRow();
-    // Lower row index ⇒ taller stack.
-    const dangerRow = Math.floor(rows * 0.2);
-    const comfortableRow = Math.floor(rows * 0.35);
+    // Lower row index ⇒ taller stack. Mestre tolerates a higher own-stack
+    // before backing off because its swap-rate is fast enough to clear it.
+    const isMaster = this.difficulty === 'master';
+    const dangerRow = Math.floor(rows * (isMaster ? 0.16 : 0.2));
+    const comfortableRow = Math.floor(rows * (isMaster ? 0.55 : 0.35));
 
     if (topMostRow !== null && topMostRow <= dangerRow) {
       // Board is dangerous — release raise immediately.
@@ -227,21 +232,33 @@ export class AIPlayer {
       this.raiseHeldUntil = 0;
       return;
     }
-    if (topMostRow !== null && topMostRow <= comfortableRow) {
-      // Board is uncomfortably high but not catastrophic — release.
-      this.engine.setManualRaise(false);
-      this.raiseHeldUntil = 0;
+    if (topMostRow === null || topMostRow > comfortableRow) {
+      // Stack is very low — Mestre holds raise CONTINUOUSLY to force a
+      // showdown. Lower difficulties still alternate hold/release.
+      if (isMaster) {
+        this.engine.setManualRaise(true);
+        return;
+      }
+      if (this.elapsedMs >= this.raiseHeldUntil) {
+        if (!this.engine.manualRaise) {
+          this.engine.setManualRaise(true);
+          this.raiseHeldUntil = this.elapsedMs + this.randomDelayMs(2.0);
+        } else {
+          this.engine.setManualRaise(false);
+          this.raiseHeldUntil = this.elapsedMs + this.randomDelayMs(1.0);
+        }
+      }
       return;
     }
-    // Comfortable: opportunistically press raise to apply pressure.
+    // Between danger and comfortable: alternate short bursts so the player
+    // still gets pressured but Mestre doesn't burn itself out.
     if (this.elapsedMs >= this.raiseHeldUntil) {
-      // Toggle: hold for a random burst.
       if (!this.engine.manualRaise) {
         this.engine.setManualRaise(true);
-        this.raiseHeldUntil = this.elapsedMs + this.randomDelayMs(2.0);
+        this.raiseHeldUntil = this.elapsedMs + this.randomDelayMs(1.5);
       } else {
         this.engine.setManualRaise(false);
-        this.raiseHeldUntil = this.elapsedMs + this.randomDelayMs(1.0);
+        this.raiseHeldUntil = this.elapsedMs + this.randomDelayMs(0.6);
       }
     }
   }
@@ -332,32 +349,49 @@ export class AIPlayer {
     let score = 0;
     const matches = findMatches(sim);
     let immediateCleared = 0;
-    for (const g of matches) immediateCleared += g.cells.length;
+    let biggestGroup = 0;
+    for (const g of matches) {
+      immediateCleared += g.cells.length;
+      if (g.cells.length > biggestGroup) biggestGroup = g.cells.length;
+    }
     score += immediateCleared * 100;
 
-    // Lookahead for cascade chains.
+    // Combo bonus: every block above the first 3 in a single group is gold —
+    // a 4-combo earns a 1x3 garbage piece, 5-combo a 1x4, 6+ a 1x5/1x6.
+    // We model that by giving combos quadratic weight beyond size 3.
+    if (biggestGroup >= 4) {
+      score += (biggestGroup - 3) * (biggestGroup - 3) * 90;
+    }
+
+    // Lookahead for cascade chains. Each cascade step is much more valuable
+    // than the previous one — a chain x3 sends a 1x4 strip, chain x5 a full
+    // row, chain x6 stacks two rows. Reward depth heavily.
     if (this.profile.chainSearchDepth > 0 && immediateCleared > 0) {
       if (this.rng() < this.profile.chainSetupRate || this.profile.chainSetupRate >= 1) {
         const depth = this.profile.chainSearchDepth;
-        const cascadeCleared = simulateCascades(sim, depth);
-        score += cascadeCleared * 50;
+        const cascade = simulateCascadesDetailed(sim, depth);
+        // Each step weight grows quadratically: step 1 = 80, step 2 = 320,
+        // step 3 = 720, step 4 = 1280, step 5 = 2000.
+        for (let i = 0; i < cascade.perStep.length; i++) {
+          const stepWeight = (i + 1) * (i + 1) * 80;
+          score += cascade.perStep[i] * stepWeight;
+        }
       }
     }
 
-    // Vertical 3-stack setup detection: if after the swap+gravity there is a
-    // column with 2 of the same color adjacent and a third of the same color
-    // ready to fall into place, give a smaller bonus. We approximate by
-    // checking for any vertical run of 2 with a same-color block one row above
-    // (or held high in the same column) that hasn't matched yet.
+    // Vertical 3-stack setup detection — bonus when a swap doesn't clear
+    // anything immediately but puts the board on a chain-ready footing.
     if (immediateCleared === 0) {
-      score += scoreVerticalSetup(sim) * 20;
+      score += scoreVerticalSetup(sim) * 25;
     }
 
-    // Penalty for tall stacks (don't pile higher).
+    // Penalty for tall stacks (don't pile higher). The penalty grows with
+    // how close the top blocks are to row 0.
     const stackHeightPenalty = stackHeightPenaltyFor(sim);
     score -= stackHeightPenalty * 10;
 
-    // Distance from current cursor: prefer nearby swaps for speed.
+    // Tiny distance penalty so the AI prefers nearby swaps — only ~3 points
+    // per Manhattan cell, dwarfed by the chain bonuses for skilled profiles.
     const dist =
       Math.abs(this.engine.cursor.row - row) +
       Math.abs(this.engine.cursor.col - col);
@@ -473,6 +507,30 @@ function simulateCascades(grid: Grid, depth: number): number {
     applySimGravity(grid);
   }
   return total;
+}
+
+/**
+ * Like `simulateCascades` but reports the cells cleared at EACH cascade step,
+ * so the caller can weight deeper cascades more heavily. `perStep[0]` is the
+ * first cascade after the immediate match, `perStep[1]` the second, etc.
+ */
+function simulateCascadesDetailed(grid: Grid, depth: number): { perStep: number[] } {
+  const perStep: number[] = [];
+  let groups = findMatches(grid);
+  if (groups.length === 0) return { perStep };
+  clearMatchedCells(grid, groups);
+  applySimGravity(grid);
+
+  for (let i = 0; i < depth; i++) {
+    groups = findMatches(grid);
+    if (groups.length === 0) break;
+    let cleared = 0;
+    for (const g of groups) cleared += g.cells.length;
+    perStep.push(cleared);
+    clearMatchedCells(grid, groups);
+    applySimGravity(grid);
+  }
+  return { perStep };
 }
 
 function clearMatchedCells(grid: Grid, groups: ReturnType<typeof findMatches>): void {

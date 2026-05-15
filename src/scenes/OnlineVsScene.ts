@@ -26,7 +26,7 @@ import { setupDefaultInputs } from '@/engine/input/setupDefaultInputs';
 import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
 import { BLOCK_COLOR_HEX, BLOCK_SYMBOL, darken } from '@/config';
-import type { BoardSnapshot, OnlineMessage, OnlinePeer } from '@/net/OnlinePeer';
+import type { BoardSnapshot, OnlineMessage, OnlinePeer, OnlineRole } from '@/net/OnlinePeer';
 
 const VS_CELL_SIZE = 22;
 const GARBAGE_FILL = 0x666666;
@@ -92,6 +92,7 @@ function decodeBlock(byte: number): DecodedCell {
 
 export class OnlineVsScene extends Phaser.Scene {
   private peer!: OnlinePeer;
+  private role!: OnlineRole;
   private myEngine!: GameEngine;
   private remoteSnapshot: BoardSnapshot | null = null;
   private mySeed = 0;
@@ -123,6 +124,7 @@ export class OnlineVsScene extends Phaser.Scene {
 
   init(data: InitData): void {
     this.peer = data.peer;
+    this.role = data.role;
     this.mySeed = data.role === 'host' ? data.hostSeed : data.guestSeed;
     this.gameEnded = false;
     this.remoteSnapshot = null;
@@ -318,6 +320,15 @@ export class OnlineVsScene extends Phaser.Scene {
       for (let col = 0; col < grid.cols; col++) {
         const cell = grid.cells[row]?.[col];
         if (!cell) continue;
+        if (cell.kind === 'garbage') {
+          const id = cell.garbageGroupId;
+          if (id !== undefined) {
+            const above = row > 0 ? grid.cells[row - 1]?.[col] : null;
+            const left = col > 0 ? grid.cells[row]?.[col - 1] : null;
+            if (above?.kind === 'garbage' && above.garbageGroupId === id) continue;
+            if (left?.kind === 'garbage' && left.garbageGroupId === id) continue;
+          }
+        }
         this.renderLocalBlock(cell, row, col, cfg, cellSize, riseShift, container);
       }
     }
@@ -358,7 +369,15 @@ export class OnlineVsScene extends Phaser.Scene {
     const cy = y + cellSize / 2;
 
     if (block.kind === 'garbage') {
-      this.drawGarbageCell(container, cx, cy, cellSize, block.unlocking ?? false);
+      this.drawGarbageCell(
+        container,
+        cx,
+        cy,
+        cellSize,
+        block.unlocking ?? false,
+        block.garbageWidth ?? 1,
+        block.garbageHeight ?? 1,
+      );
       return;
     }
 
@@ -442,14 +461,20 @@ export class OnlineVsScene extends Phaser.Scene {
     cy: number,
     cellSize: number,
     unlocking: boolean,
+    gw = 1,
+    gh = 1,
   ): void {
     const fill = unlocking ? GARBAGE_UNLOCK_FILL : GARBAGE_FILL;
-    const rect = this.add.rectangle(cx, cy, cellSize - 2, cellSize - 2, fill, 1);
-    rect.setStrokeStyle(1, GARBAGE_OUTLINE, 1);
+    const totalW = gw * cellSize;
+    const totalH = gh * cellSize;
+    const groupCx = cx + ((gw - 1) * cellSize) / 2;
+    const groupCy = cy + ((gh - 1) * cellSize) / 2;
+    const rect = this.add.rectangle(groupCx, groupCy, totalW - 2, totalH - 2, fill, 1);
+    rect.setStrokeStyle(2, GARBAGE_OUTLINE, 1);
     const glyph = this.add
-      .text(cx, cy, '■', {
+      .text(groupCx, groupCy, '■', {
         fontFamily: 'monospace',
-        fontSize: '8px',
+        fontSize: '10px',
         color: '#bbb',
       })
       .setOrigin(0.5);
@@ -565,11 +590,16 @@ export class OnlineVsScene extends Phaser.Scene {
     this.gameEnded = true;
     BGMPlayer.get().stop();
     SFXPlayer.get().gameOver();
+    // Hand the peer over to OnlineResultScene — it owns rematch + cleanup
+    // until the player either restarts the match or returns to the lobby.
+    this.didTransferPeer = true;
     this.scene.launch('OnlineResultScene', {
       outcome,
       reason,
       myScore: this.myEngine.score.score,
       opponentScore: this.remoteSnapshot?.score ?? 0,
+      peer: this.peer,
+      role: this.role,
     });
     this.scene.pause();
   }

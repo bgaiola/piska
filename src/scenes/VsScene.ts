@@ -402,6 +402,18 @@ export class VsScene extends Phaser.Scene {
       for (let col = 0; col < grid.cols; col++) {
         const cell = grid.cells[row]?.[col];
         if (!cell) continue;
+        // Multi-cell garbage groups render as a single rectangle anchored
+        // at the group's top-left; the other cells of the group skip so we
+        // get one solid bar instead of a row of bordered tiles.
+        if (cell.kind === 'garbage') {
+          const id = cell.garbageGroupId;
+          if (id !== undefined) {
+            const above = row > 0 ? grid.cells[row - 1]?.[col] : null;
+            const left = col > 0 ? grid.cells[row]?.[col - 1] : null;
+            if (above?.kind === 'garbage' && above.garbageGroupId === id) continue;
+            if (left?.kind === 'garbage' && left.garbageGroupId === id) continue;
+          }
+        }
         this.renderBlock(cell, row, col, cfg, cellSize, riseShift, container);
       }
     }
@@ -484,13 +496,23 @@ export class VsScene extends Phaser.Scene {
     block: Block,
   ): void {
     const fill = block.unlocking ? GARBAGE_UNLOCK_FILL : GARBAGE_FILL;
-    const rect = this.add.rectangle(cx, cy, cellSize - 2, cellSize - 2, fill, 1);
-    rect.setStrokeStyle(1, GARBAGE_OUTLINE, 1);
+    // Group dimensions in cells. Falls back to 1×1 for legacy / decoded data
+    // that doesn't carry the group bounds.
+    const gw = block.garbageWidth ?? 1;
+    const gh = block.garbageHeight ?? 1;
+    const totalW = gw * cellSize;
+    const totalH = gh * cellSize;
+    // (cx, cy) is the *single-cell* center. The group's center is offset by
+    // (gw - 1)/2 cells right and (gh - 1)/2 cells down from the top-left cell.
+    const groupCx = cx + ((gw - 1) * cellSize) / 2;
+    const groupCy = cy + ((gh - 1) * cellSize) / 2;
+    const rect = this.add.rectangle(groupCx, groupCy, totalW - 2, totalH - 2, fill, 1);
+    rect.setStrokeStyle(2, GARBAGE_OUTLINE, 1);
 
     const glyph = this.add
-      .text(cx, cy, '■', {
+      .text(groupCx, groupCy, '■', {
         fontFamily: 'monospace',
-        fontSize: '8px',
+        fontSize: '10px',
         color: '#bbb',
       })
       .setOrigin(0.5);

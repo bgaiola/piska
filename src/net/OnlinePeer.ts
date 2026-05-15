@@ -41,7 +41,12 @@ export type OnlineMessage =
   | { kind: 'state'; snapshot: BoardSnapshot }
   | { kind: 'gameover'; reason: 'topout' | 'disconnect' }
   | { kind: 'ping'; t: number }
-  | { kind: 'pong'; t: number };
+  | { kind: 'pong'; t: number }
+  /** Sent by either side from the result screen to request a rematch. The
+   *  host (whoever was host originally) emits `rematch-start` once both
+   *  peers have asked for a rematch. */
+  | { kind: 'rematch' }
+  | { kind: 'rematch-start'; hostSeed: number; guestSeed: number; startsAt: number };
 
 export interface OnlinePeerHandlers {
   /** Fires once the local peer is registered with the broker. For hosts the
