@@ -115,7 +115,10 @@ export class VsResultScene extends Phaser.Scene {
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
 
-    this.add.rectangle(0, 0, w, h, 0x000000, 0.75).setOrigin(0, 0);
+    // Opaque backdrop so the paused Vs scene (boards, HUD, chain popups,
+    // garbage queue) doesn't bleed through and visually compete with the
+    // result panel.
+    this.add.rectangle(0, 0, w, h, 0x14081c, 1).setOrigin(0, 0);
 
     this.add
       .text(w / 2, h * 0.22, this.result.headlineText, {
@@ -125,12 +128,11 @@ export class VsResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // Difficulty banner only relevant for the AI flow.
     if (this.result.mode === 'ai') {
       this.add
         .text(
           w / 2,
-          h * 0.36,
+          h * 0.32,
           t('vs.difficulty', { difficulty: difficultyLabel(this.result.difficulty) }),
           {
             fontFamily: 'monospace',
@@ -141,7 +143,7 @@ export class VsResultScene extends Phaser.Scene {
         .setOrigin(0.5);
     } else {
       this.add
-        .text(w / 2, h * 0.36, t('vs.local.subtitle'), {
+        .text(w / 2, h * 0.32, t('vs.local.subtitle'), {
           fontFamily: 'monospace',
           fontSize: '12px',
           color: '#bbf',
@@ -149,34 +151,42 @@ export class VsResultScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
+    // Scoreboard: two columns flanking the vertical centerline so the panel
+    // reads as a head-to-head card on both narrow phones and wide desktop.
+    const colOffset = 90;
+    const scoreLabelY = h * 0.44;
+    const scoreValueY = h * 0.5;
     this.add
-      .text(
-        w / 2,
-        h * 0.46,
-        `${this.result.leftLabel}   ${this.result.leftScore}`,
-        {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: FOCUS_TEXT,
-        },
-      )
+      .text(w / 2 - colOffset, scoreLabelY, this.result.leftLabel, {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#bbb',
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(w / 2 - colOffset, scoreValueY, `${this.result.leftScore}`, {
+        fontFamily: 'monospace',
+        fontSize: '22px',
+        color: FOCUS_TEXT,
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(w / 2 + colOffset, scoreLabelY, this.result.rightLabel, {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#bbb',
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(w / 2 + colOffset, scoreValueY, `${this.result.rightScore}`, {
+        fontFamily: 'monospace',
+        fontSize: '22px',
+        color: UNFOCUS_TEXT,
+      })
       .setOrigin(0.5);
 
-    this.add
-      .text(
-        w / 2,
-        h * 0.52,
-        `${this.result.rightLabel}   ${this.result.rightScore}`,
-        {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          color: UNFOCUS_TEXT,
-        },
-      )
-      .setOrigin(0.5);
-
-    this.buildAction(w / 2, h * 0.7, 'replay', t('vs.replay'));
-    this.buildAction(w / 2, h * 0.8, 'back', t('vs.back'));
+    this.buildAction(w / 2, h * 0.68, 'replay', t('vs.replay'));
+    this.buildAction(w / 2, h * 0.78, 'back', t('vs.back'));
 
     this.add
       .text(w / 2, h - 18, t('vs.hint'), {

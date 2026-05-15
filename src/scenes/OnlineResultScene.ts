@@ -82,7 +82,9 @@ export class OnlineResultScene extends Phaser.Scene {
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
 
-    this.add.rectangle(0, 0, w, h, 0x000000, 0.75).setOrigin(0, 0);
+    // Opaque backdrop — the paused OnlineVsScene would otherwise show
+    // through, with its HUD landing right where our score lines do.
+    this.add.rectangle(0, 0, w, h, 0x14081c, 1).setOrigin(0, 0);
 
     let headline: string;
     let headlineColor: string;
@@ -106,18 +108,36 @@ export class OnlineResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    // Scoreboard as a two-column head-to-head, mirroring VsResultScene so
+    // the result panel looks consistent across AI / local / online modes.
+    const colOffset = 90;
+    const scoreLabelY = h * 0.34;
+    const scoreValueY = h * 0.4;
     this.add
-      .text(w / 2, h * 0.32, `VOCÊ        ${this.result.myScore}`, {
+      .text(w / 2 - colOffset, scoreLabelY, 'VOCÊ', {
         fontFamily: 'monospace',
-        fontSize: '13px',
+        fontSize: '12px',
+        color: '#bbb',
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(w / 2 - colOffset, scoreValueY, `${this.result.myScore}`, {
+        fontFamily: 'monospace',
+        fontSize: '22px',
         color: FOCUS_TEXT,
       })
       .setOrigin(0.5);
-
     this.add
-      .text(w / 2, h * 0.39, `ADVERSÁRIO  ${this.result.opponentScore}`, {
+      .text(w / 2 + colOffset, scoreLabelY, 'ADVERSÁRIO', {
         fontFamily: 'monospace',
-        fontSize: '13px',
+        fontSize: '12px',
+        color: '#bbb',
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(w / 2 + colOffset, scoreValueY, `${this.result.opponentScore}`, {
+        fontFamily: 'monospace',
+        fontSize: '22px',
         color: UNFOCUS_TEXT,
       })
       .setOrigin(0.5);
