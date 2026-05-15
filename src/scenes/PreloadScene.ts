@@ -51,6 +51,9 @@ export class PreloadScene extends Phaser.Scene {
       g.strokeRect(1, 1, size - 2, size - 2);
       g.generateTexture(key, size, size);
       g.destroy();
+      // Keep block art chunky even though the game-wide pixelArt flag is off
+      // (we disabled it so menu text renders crisply).
+      this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
   }
 
@@ -68,6 +71,7 @@ export class PreloadScene extends Phaser.Scene {
     g.strokeRect(1, 1, w - 2, h - 2);
     g.generateTexture(key, w, h);
     g.destroy();
+    this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
   }
 
   /**

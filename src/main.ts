@@ -27,7 +27,6 @@ import { AdventureMapScene } from '@/scenes/AdventureMapScene';
 import { AdventureStageSelectScene } from '@/scenes/AdventureStageSelectScene';
 import { StageIntroScene } from '@/scenes/StageIntroScene';
 import { StageOutroScene } from '@/scenes/StageOutroScene';
-import { LOGICAL_PORTRAIT, LOGICAL_LANDSCAPE } from '@/config';
 import { i18n } from '@/i18n';
 import ptBR from '@/i18n/pt-BR';
 import esES from '@/i18n/es-ES';
@@ -52,18 +51,19 @@ i18n.init();
   SFXPlayer.get().setVolume(s.sfxVolume);
 }
 
-const portrait = window.innerWidth < window.innerHeight;
-const dims = portrait ? LOGICAL_PORTRAIT : LOGICAL_LANDSCAPE;
-
+// Canvas fills the viewport (Phaser.Scale.RESIZE). No letterbox, every tap
+// reaches the game. Block textures opt into NEAREST sampling in PreloadScene
+// so they still look pixel-art; menu/HUD text now renders crisply at the
+// device's native resolution instead of being upscaled with NEAREST too.
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game-root',
-  width: dims.width,
-  height: dims.height,
-  pixelArt: true,
+  width: window.innerWidth,
+  height: window.innerHeight,
+  antialias: true,
   backgroundColor: '#1a0f1f',
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   scene: [
@@ -100,15 +100,12 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   });
 }
 
-let lastPortrait = portrait;
-
 function handleViewportChange(): void {
-  const nowPortrait = window.innerWidth < window.innerHeight;
-  if (nowPortrait === lastPortrait) return;
-  lastPortrait = nowPortrait;
-  const d = nowPortrait ? LOGICAL_PORTRAIT : LOGICAL_LANDSCAPE;
-  game.scale.setGameSize(d.width, d.height);
-  game.events.emit('layout-changed', { portrait: nowPortrait });
+  // With Scale.RESIZE Phaser already updates gameSize for us; we just relay a
+  // typed event so scenes can re-position their UI without depending on the
+  // scale manager's own 'resize' wiring.
+  const portrait = window.innerWidth < window.innerHeight;
+  game.events.emit('layout-changed', { portrait });
 }
 
 window.addEventListener('resize', handleViewportChange);

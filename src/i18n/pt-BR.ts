@@ -8,7 +8,8 @@ import type { TranslationDict } from './index';
 const dict: TranslationDict = {
   // Title
   'title.subtitle': 'Endless Mode',
-  'title.prompt': 'Tap ou Espaço para jogar',
+  'title.cta': 'JOGAR',
+  'title.prompt': 'ou Espaço',
   'title.dedication': 'Para Carina,\nque jogou tanto que esqueceu de piscar.',
 
   // Mode select

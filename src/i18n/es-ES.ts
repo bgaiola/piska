@@ -7,7 +7,8 @@ import type { TranslationDict } from './index';
 const dict: TranslationDict = {
   // Title
   'title.subtitle': 'Modo Sin Fin',
-  'title.prompt': 'Toca o Espacio para jugar',
+  'title.cta': 'JUGAR',
+  'title.prompt': 'o Espacio',
   'title.dedication': 'Para Carina,\nque jugó tanto que olvidó parpadear.',
 
   // Mode select
