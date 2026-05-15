@@ -1,0 +1,145 @@
+/* PISKA — page-level CSS.
+ * Reset margins, prevent overscroll/zoom, make the canvas full-bleed,
+ * expose safe-area insets as CSS variables for the virtual buttons.
+ */
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --piska-bg: #1a0f1f;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--piska-bg);
+  height: 100%;
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: 'Press Start 2P', monospace;
+  image-rendering: pixelated;
+}
+
+#game-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+}
+
+/* ---------- Virtual buttons (mobile overlay) ---------- */
+
+.piska-vb {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  border-radius: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  font-family: inherit;
+  font-size: 14px;
+  pointer-events: auto;
+  transition:
+    transform 80ms ease,
+    background 80ms ease;
+}
+
+.piska-vb.is-pressed {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0.95);
+}
+
+.piska-vb-swap {
+  width: 80px;
+  height: 80px;
+  right: calc(24px + var(--safe-right));
+  bottom: calc(24px + var(--safe-bottom));
+  background: rgba(220, 80, 120, 0.55);
+  font-size: 24px;
+}
+
+.piska-vb-raise {
+  width: 64px;
+  height: 64px;
+  right: calc(32px + var(--safe-right));
+  bottom: calc(120px + var(--safe-bottom));
+}
+
+.piska-vb-pause {
+  width: 40px;
+  height: 40px;
+  right: calc(16px + var(--safe-right));
+  top: calc(16px + var(--safe-top));
+}
+
+.piska-vb-dpad {
+  position: absolute;
+  left: calc(24px + var(--safe-left));
+  bottom: calc(24px + var(--safe-bottom));
+  width: 168px;
+  height: 168px;
+}
+
+.piska-vb-dpad .piska-vb {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+}
+
+.piska-vb-dpad-up {
+  top: 0;
+  left: 56px;
+}
+.piska-vb-dpad-down {
+  bottom: 0;
+  left: 56px;
+}
+.piska-vb-dpad-left {
+  left: 0;
+  top: 56px;
+}
+.piska-vb-dpad-right {
+  right: 0;
+  top: 56px;
+}
+
+/* When side='left', mirror the swap/raise/dpad horizontally */
+.piska-vb-mirror .piska-vb-swap {
+  right: auto;
+  left: calc(24px + var(--safe-left));
+}
+.piska-vb-mirror .piska-vb-raise {
+  right: auto;
+  left: calc(32px + var(--safe-left));
+}
+.piska-vb-mirror .piska-vb-dpad {
+  left: auto;
+  right: calc(24px + var(--safe-right));
+}
+.piska-vb-mirror .piska-vb-pause {
+  right: auto;
+  left: calc(16px + var(--safe-left));
+}

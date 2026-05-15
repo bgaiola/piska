@@ -1,0 +1,14 @@
+{
+  "name": "PISKA",
+  "short_name": "PISKA",
+  "description": "Puzzle 2D em estilo Panel de Pon, com modos Endless, Time Attack, Vs IA e Aventura.",
+  "start_url": "/piska/",
+  "scope": "/piska/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a0f1f",
+  "theme_color": "#1a0f1f",
+  "icons": [
+    { "src": "/piska/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

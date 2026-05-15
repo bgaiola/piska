@@ -1,0 +1,125 @@
+/**
+ * en — English translation. Mirrors keys from pt-BR.
+ */
+
+import type { TranslationDict } from './index';
+
+const dict: TranslationDict = {
+  // Title
+  'title.subtitle': 'Endless Mode',
+  'title.prompt': 'Tap or Space to play',
+  'title.dedication': 'For Carina,\nwho played so much she forgot to blink.',
+
+  // Mode select
+  'modeselect.heading.main': 'Choose a mode',
+  'modeselect.heading.difficulty': 'AI Difficulty',
+  'modeselect.hint.main': '↑↓ Navigate  •  Enter Select  •  Esc Back',
+  'modeselect.hint.difficulty': '↑↓ Navigate  •  Enter Confirm  •  Esc Back',
+  'modeselect.adventure.label': 'Adventure',
+  'modeselect.adventure.subtitle': 'Story campaign with six worlds.',
+  'modeselect.endless.label': 'Endless',
+  'modeselect.endless.subtitle': 'Survive as long as you can.',
+  'modeselect.vsai.label': 'Vs Cláudio',
+  'modeselect.vsai.subtitle': 'Duel against Cláudio (AI).',
+  'modeselect.vslocal.label': 'Vs Local',
+  'modeselect.vslocal.subtitle': 'Two players, one keyboard.',
+  'modeselect.vsonline.label': 'Vs Online',
+  'modeselect.vsonline.subtitle': 'Duel via room code.',
+  'modeselect.timeattack.label': 'Time Attack',
+  'modeselect.timeattack.subtitle': 'Score the most in 2 minutes.',
+  'modeselect.stageclear.label': 'Stage Clear',
+  'modeselect.stageclear.subtitle': 'Clear the stack before it rises.',
+  'modeselect.puzzle.label': 'Puzzle',
+  'modeselect.puzzle.subtitle': 'Available through Adventure.',
+  'modeselect.settings': 'Settings',
+
+  // Difficulty
+  'difficulty.easy.label': 'Easy',
+  'difficulty.easy.subtitle': 'Distracted Cláudio — good warm-up.',
+  'difficulty.medium.label': 'Medium',
+  'difficulty.medium.subtitle': 'Attentive Cláudio, few mistakes.',
+  'difficulty.hard.label': 'Hard',
+  'difficulty.hard.subtitle': 'Aggressive Cláudio, hunts for chains.',
+  'difficulty.master.label': 'Master',
+  'difficulty.master.subtitle': 'Relentless Cláudio, no mistakes.',
+
+  // HUD
+  'hud.score': 'SCORE',
+  'hud.time': 'TIME',
+  'hud.chain': 'CHAIN x{{n}}!',
+  'hud.garbage': 'Garbage: {{n}}',
+
+  // Result
+  'result.endless': 'ENDLESS',
+  'result.timeattack': 'TIME ATTACK',
+  'result.stageclear': 'STAGE CLEAR',
+  'result.puzzle.complete': 'PUZZLE COMPLETE',
+  'result.puzzle.retry': 'TRY AGAIN',
+  'result.vs': 'VS RESULT',
+  'result.generic': 'RESULT',
+  'result.score': 'SCORE {{n}}',
+  'result.time': 'TIME {{t}}',
+  'result.moves': 'MOVES {{used}}/{{allowed}}',
+  'result.remaining': 'REMAINING {{n}}',
+  'result.prompt': 'Tap / Space to return',
+
+  // Versus
+  'vs.you': 'YOU',
+  'vs.ai': 'Cláudio',
+  'vs.ai.label': 'Cláudio: {{difficulty}}',
+  'vs.you.won': 'YOU WIN!',
+  'vs.ai.won': 'CLÁUDIO WINS!',
+  'vs.difficulty': 'Difficulty: {{difficulty}}',
+  'vs.score.line': '{{label}}   {{score}}',
+  'vs.replay': 'Play again',
+  'vs.back': 'Back to menu',
+  'vs.hint': '↑↓ Navigate  •  Enter Select',
+  'vs.garbage': 'GARBAGE: {{n}}',
+  'vs.p1': 'P1',
+  'vs.p2': 'P2',
+  'vs.p1.won': 'PLAYER 1 WINS!',
+  'vs.p2.won': 'PLAYER 2 WINS!',
+  'vs.local.subtitle': 'Two players — same keyboard',
+
+  // Pause
+  'pause.title': 'PAUSED',
+  'pause.prompt': 'Tap / Space to resume',
+  'pause.resume': 'Resume',
+  'pause.quit': 'Quit to menu',
+  'pause.hint': '↑↓ Navigate  •  Enter Select  •  Esc Resume',
+
+  // Game over (legacy)
+  'gameover.title': 'GAME OVER',
+  'gameover.prompt': 'Tap / Space to restart',
+
+  // Settings
+  'settings.title': 'Settings',
+  'settings.language': 'Language',
+  'settings.bgm': 'Music (BGM)',
+  'settings.sfx': 'Effects (SFX)',
+  'settings.vibration': 'Vibration',
+  'settings.touchSide': 'Touch layout',
+  'settings.touchSide.right': 'Right-handed',
+  'settings.touchSide.left': 'Left-handed',
+  'settings.pixelPerfect': 'Pixel perfect',
+  'settings.pixelPerfect.note': '(requires reload)',
+  'settings.reset': 'Reset progress',
+  'settings.reset.confirm': 'Erase all progress?',
+  'settings.reset.done': 'Progress erased.',
+  'settings.back': 'Back',
+  'settings.on': 'On',
+  'settings.off': 'Off',
+  'settings.lang.pt-BR': 'Português',
+  'settings.lang.es-ES': 'Español',
+  'settings.lang.en': 'English',
+  'settings.hint': '↑↓ Navigate  •  ←→ Adjust  •  Enter Confirm  •  Esc Back',
+
+  // Common
+  'common.back': 'Back',
+  'common.confirm': 'Confirm',
+  'common.cancel': 'Cancel',
+  'common.yes': 'Yes',
+  'common.no': 'No',
+};
+
+export default dict;
