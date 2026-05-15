@@ -27,16 +27,11 @@
 
 import Phaser from 'phaser';
 import { GameEngine } from '@/engine';
-import type { Block, BlockColor, EngineConfig, EngineEvent } from '@/engine';
+import type { Block, EngineConfig, EngineEvent } from '@/engine';
 import { setupDefaultInputs } from '@/engine/input/setupDefaultInputs';
 import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
-import {
-  BLOCK_COLOR_HEX,
-  BLOCK_SYMBOL,
-  BLOCK_SIZE_LOGICAL,
-  darken,
-} from '@/config';
+import { BLOCK_COLOR_HEX, BLOCK_SIZE_LOGICAL } from '@/config';
 import {
   EndlessMode,
   PuzzleMode,
@@ -489,35 +484,17 @@ export class GameScene extends Phaser.Scene {
 
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
-    const fillColor = flashWhite
-      ? 0xffffff
-      : BLOCK_COLOR_HEX[block.color as BlockColor];
-    const outlineColor = darken(BLOCK_COLOR_HEX[block.color as BlockColor], 0.5);
 
-    const rect = this.add.rectangle(
-      cx,
-      cy,
-      cellSize - 2,
-      cellSize - 2,
-      fillColor,
-      alpha,
-    );
-    rect.setStrokeStyle(1, outlineColor, alpha);
-    rect.setScale(scale);
+    // PreloadScene bakes a 16-bit tile (gradient, outline, highlight,
+    // shadow, glyph) into `block-<color>`. The texture is already
+    // BLOCK_SIZE_LOGICAL × BLOCK_SIZE_LOGICAL (== cellSize here) so we
+    // only apply the animation-driven scale + flash on top.
+    const sprite = this.add.image(cx, cy, `block-${block.color}`);
+    sprite.setAlpha(alpha);
+    sprite.setScale(scale);
+    if (flashWhite) sprite.setTintFill(0xffffff);
 
-    const symbolColor = this.symbolColorFor(block.color);
-    const label = this.add
-      .text(cx, cy, BLOCK_SYMBOL[block.color as BlockColor], {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: symbolColor,
-      })
-      .setOrigin(0.5)
-      .setAlpha(alpha)
-      .setScale(scale);
-
-    this.blocks.add(rect);
-    this.blocks.add(label);
+    this.blocks.add(sprite);
   }
 
   /**
@@ -635,18 +612,6 @@ export class GameScene extends Phaser.Scene {
     const canvas = this.game.canvas;
     const ratio = canvas.clientWidth / this.scale.gameSize.width;
     return BLOCK_SIZE_LOGICAL * ratio;
-  }
-
-  private symbolColorFor(color: BlockColor): string {
-    // Dark glyph on bright blocks, light glyph on dark ones.
-    switch (color) {
-      case 'yellow':
-      case 'cyan':
-      case 'green':
-        return '#1a0f1f';
-      default:
-        return '#ffffff';
-    }
   }
 
   // ---------------------------------------------------------------------------
