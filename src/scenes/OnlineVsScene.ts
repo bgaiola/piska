@@ -395,6 +395,8 @@ export class OnlineVsScene extends Phaser.Scene {
       const cx = col * cellSize + cellSize / 2;
       const cy = row * cellSize - riseShift + cellSize / 2;
       if (cell.kind === 'garbage') {
+        // Legacy peer that didn't split garbage into groups — render the
+        // single cell on its own so it still shows up.
         this.drawGarbageCell(container, cx, cy, cellSize, cell.unlocking);
         continue;
       }
@@ -403,6 +405,13 @@ export class OnlineVsScene extends Phaser.Scene {
       // tiles which is fine at 10fps and saves the bandwidth.
       const flashWhite = cell.state === 'clearing';
       this.drawColorCell(container, cx, cy, cellSize, cell.color, 1, 1, flashWhite);
+    }
+
+    // Garbage groups: one cohesive bar per group, anchored at its top-left.
+    for (const [row, col, gw, gh, unlockingBit] of snap.garbageGroups ?? []) {
+      const cx = col * cellSize + cellSize / 2;
+      const cy = row * cellSize - riseShift + cellSize / 2;
+      this.drawGarbageCell(container, cx, cy, cellSize, unlockingBit === 1, gw, gh);
     }
 
     // Opponent cursor (drawn inside the container so it follows the right
@@ -517,15 +526,42 @@ export class OnlineVsScene extends Phaser.Scene {
   private makeSnapshot(): BoardSnapshot {
     const g = this.myEngine.grid;
     const cells: Array<[number, number, number]> = [];
+    const garbageGroups: Array<[number, number, number, number, number]> = [];
     for (let r = 0; r < g.rows; r++) {
       for (let c = 0; c < g.cols; c++) {
         const cell = g.cells[r]?.[c];
         if (!cell) continue;
+        if (cell.kind === 'garbage') {
+          // Emit garbage groups once per group, anchored at the top-left
+          // cell. The receiver renders the whole rectangle in one piece.
+          const id = cell.garbageGroupId;
+          if (id !== undefined) {
+            const above = r > 0 ? g.cells[r - 1]?.[c] : null;
+            const left = c > 0 ? g.cells[r]?.[c - 1] : null;
+            const isAnchor =
+              !(above?.kind === 'garbage' && above.garbageGroupId === id) &&
+              !(left?.kind === 'garbage' && left.garbageGroupId === id);
+            if (isAnchor) {
+              garbageGroups.push([
+                r,
+                c,
+                cell.garbageWidth ?? 1,
+                cell.garbageHeight ?? 1,
+                cell.unlocking ? 1 : 0,
+              ]);
+            }
+          } else {
+            // Defensive fallback for any 1×1 garbage without a group id.
+            cells.push([r, c, encodeBlock(cell)]);
+          }
+          continue;
+        }
         cells.push([r, c, encodeBlock(cell)]);
       }
     }
     return {
       cells,
+      garbageGroups,
       score: this.myEngine.score.score,
       cursor: { row: this.myEngine.cursor.row, col: this.myEngine.cursor.col },
       riseOffset: g.riseOffset,

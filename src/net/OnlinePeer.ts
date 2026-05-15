@@ -22,10 +22,17 @@ import type { GarbagePiece } from '@/engine';
 export type OnlineRole = 'host' | 'guest';
 
 export interface BoardSnapshot {
-  /** Sparse list of occupied cells. Each entry is `[row, col, encodedByte]`.
+  /** Sparse list of occupied COLORED cells. Each entry is `[row, col, encodedByte]`.
    *  `encodedByte` packs `color (3 bits) | kind (1 bit) | state (3 bits) | unlocking (1 bit)`.
-   *  See `encodeBlock` / `decodeBlock` in `OnlineVsScene`. */
+   *  Garbage cells are encoded separately in `garbageGroups` so the receiver can
+   *  render them as cohesive bars rather than per-cell tiles. See
+   *  `encodeBlock` / `decodeBlock` in `OnlineVsScene`. */
   cells: Array<[number, number, number]>;
+  /** One entry per garbage group anchored at its top-left cell:
+   *  `[row, col, width, height, unlockingBit]`. Optional for backward
+   *  compat with older peers — if absent, the receiver falls back to
+   *  per-cell garbage entries in `cells`. */
+  garbageGroups?: Array<[number, number, number, number, number]>;
   score: number;
   cursor: { row: number; col: number };
   riseOffset: number;
