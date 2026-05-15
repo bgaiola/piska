@@ -62,10 +62,12 @@ export class VsScene extends Phaser.Scene {
   // HUD labels per side.
   private playerLabel: Phaser.GameObjects.Text | null = null;
   private aiLabel: Phaser.GameObjects.Text | null = null;
+  private aiSubLabel: Phaser.GameObjects.Text | null = null;
   private playerScoreText: Phaser.GameObjects.Text | null = null;
   private aiScoreText: Phaser.GameObjects.Text | null = null;
   private playerGarbageText: Phaser.GameObjects.Text | null = null;
   private aiGarbageText: Phaser.GameObjects.Text | null = null;
+  private aiPortrait: CharacterPortrait | null = null;
 
   private offFns: Array<() => void> = [];
   private inputCtrlDestroy: (() => void) | null = null;
@@ -75,6 +77,9 @@ export class VsScene extends Phaser.Scene {
   /** Set when launched from the Adventure flow. Routes the end-of-match to
    *  StageOutroScene instead of VsResultScene. */
   private adventureStageId: string | undefined;
+  /** Cached Adventure stage def + character def for HUD rendering. */
+  private adventureStage: StageDef | undefined;
+  private adventureCharacter: CharacterDef | undefined;
 
   constructor() {
     super('VsScene');
@@ -89,6 +94,15 @@ export class VsScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Resolve the Adventure stage/character once so HUD rendering and
+    // re-layouts can rebuild the portrait without re-doing the lookup.
+    this.adventureStage = this.adventureStageId
+      ? getStageById(this.adventureStageId)
+      : undefined;
+    this.adventureCharacter = this.adventureStage
+      ? CHARACTERS[this.adventureStage.characterId]
+      : undefined;
+
     // Distinct seeds so the two boards diverge from the start.
     const baseSeed = Date.now() & 0x7fffffff;
     this.playerEngine = new GameEngine({ rngSeed: baseSeed });
@@ -195,13 +209,54 @@ export class VsScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    // In Adventure runs the AI is the world's character (Pim, Salla, ...),
+    // so we show their name + species/difficulty in place of "Cláudio: <diff>".
+    const charDef = this.adventureCharacter;
+    const aiLabelText = charDef
+      ? charDef.name
+      : `Cláudio: ${DIFFICULTY_LABEL[this.difficulty]}`;
+    const aiSubText = charDef
+      ? `${charDef.species} • ${DIFFICULTY_LABEL[this.difficulty]}`
+      : null;
+
     this.aiLabel = this.add
-      .text(aiCenterX, labelY, `IA: ${DIFFICULTY_LABEL[this.difficulty]}`, {
+      .text(aiCenterX, labelY, aiLabelText, {
         fontFamily: 'monospace',
         fontSize: '12px',
         color: HUD_LABEL_COLOR,
       })
       .setOrigin(0.5);
+
+    if (aiSubText) {
+      this.aiSubLabel = this.add
+        .text(aiCenterX, labelY + 12, aiSubText, {
+          fontFamily: 'monospace',
+          fontSize: '9px',
+          color: HUD_SUB_COLOR,
+        })
+        .setOrigin(0.5);
+    }
+
+    // Small character portrait tucked to the outer-left of the AI board
+    // (Adventure runs only). Positioned beside the board so it does not
+    // overlap with the playfield or the HUD labels above it.
+    if (charDef) {
+      const portraitSize = 48;
+      const portraitX = Math.max(
+        portraitSize / 2 + 4,
+        this.aiOrigin.x - portraitSize / 2 - 8,
+      );
+      const portraitY =
+        this.aiOrigin.y + this.playerRows() * this.cellSize - portraitSize / 2;
+      this.aiPortrait = new CharacterPortrait({
+        scene: this,
+        x: portraitX,
+        y: portraitY,
+        characterId: charDef.id,
+        size: portraitSize,
+        showLabel: false,
+      });
+    }
 
     this.playerScoreText = this.add
       .text(playerCenterX, subY, '0', {
@@ -733,16 +788,20 @@ export class VsScene extends Phaser.Scene {
   private destroyHud(): void {
     this.playerLabel?.destroy();
     this.aiLabel?.destroy();
+    this.aiSubLabel?.destroy();
     this.playerScoreText?.destroy();
     this.aiScoreText?.destroy();
     this.playerGarbageText?.destroy();
     this.aiGarbageText?.destroy();
+    this.aiPortrait?.destroy();
     this.playerLabel = null;
     this.aiLabel = null;
+    this.aiSubLabel = null;
     this.playerScoreText = null;
     this.aiScoreText = null;
     this.playerGarbageText = null;
     this.aiGarbageText = null;
+    this.aiPortrait = null;
   }
 
   private cleanup(): void {

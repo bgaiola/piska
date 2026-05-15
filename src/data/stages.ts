@@ -856,9 +856,9 @@ export function computeStarsForStage(
   if (data.mode === 'vs-ai') {
     const crit = stage.starCriteria;
     if (crit.score) {
-      const raw = starsFromHigherIsBetter(data.score, crit.score);
-      // Winning the duel always grants at least 1 star.
-      return (raw === 0 ? 1 : raw) as 1 | 2 | 3;
+      // Winning the duel always grants at least 1 star, even on a low score.
+      const raw = starsFromHigherIsBetterMin(data.score, crit.score, 1);
+      return raw as 1 | 2 | 3;
     }
     return 1;
   }
@@ -868,10 +868,10 @@ export function computeStarsForStage(
   }
   const crit = stage.starCriteria;
   if (crit.score) {
-    return starsFromHigherIsBetter(data.score, crit.score);
+    return starsFromHigherIsBetterMin(data.score, crit.score, 1);
   }
   if (crit.timeMs) {
-    return starsFromHigherIsBetter(data.timeMs, crit.timeMs);
+    return starsFromHigherIsBetterMin(data.timeMs, crit.timeMs, 1);
   }
   if (crit.remainingBlocks && data.remainingBlocks !== undefined) {
     return starsFromLowerIsBetter(data.remainingBlocks, crit.remainingBlocks);
@@ -879,14 +879,15 @@ export function computeStarsForStage(
   return 1;
 }
 
-function starsFromHigherIsBetter(
+function starsFromHigherIsBetterMin(
   value: number,
   th: { '1': number; '2': number; '3': number },
+  floor: 0 | 1,
 ): 0 | 1 | 2 | 3 {
   if (value >= th['3']) return 3;
   if (value >= th['2']) return 2;
   if (value >= th['1']) return 1;
-  return 0;
+  return floor;
 }
 
 function starsFromLowerIsBetter(
