@@ -24,6 +24,7 @@ import { BLOCK_COLOR_HEX, BLOCK_SYMBOL, darken } from '@/config';
 import { ChainPopup } from '@/ui/ChainPopup';
 import { spawnClearBurst } from '@/engine/ParticleFX';
 import { getStageById, computeStarsForStage, type StageDef } from '@/data/stages';
+import { haptic, HAPTIC } from '@/utils/haptics';
 import { CHARACTERS, type CharacterDef } from '@/data/characters';
 import { CharacterPortrait } from '@/ui/CharacterPortrait';
 
@@ -593,10 +594,15 @@ export class VsScene extends Phaser.Scene {
       this.playerEngine.events.on((e: EngineEvent) => {
         if (e.type === 'block.swapped') {
           SFXPlayer.get().swap();
+          haptic(HAPTIC.swap);
         } else if (e.type === 'match.found') {
           SFXPlayer.get().clear(e.comboSize);
           if (e.chain >= 2) SFXPlayer.get().chain(e.chain);
           this.onMatchFound(this.playerEngine, e, this.playerOrigin.x, this.playerOrigin.y);
+        } else if (e.type === 'garbage.dropped') {
+          haptic(HAPTIC.garbage);
+        } else if (e.type === 'game.over') {
+          haptic(HAPTIC.gameOver);
         }
       }),
     );
@@ -635,8 +641,13 @@ export class VsScene extends Phaser.Scene {
       spawnClearBurst(this, cx, cy, BLOCK_COLOR_HEX[block.color]);
     }
 
-    if (e.chain >= 5 || e.comboSize >= 6) {
-      this.cameras.main.shake(220, 0.005);
+    if (e.chain >= 3 || e.comboSize >= 5) {
+      const intensity = Math.min(0.012, 0.004 + e.chain * 0.0015);
+      this.cameras.main.shake(100 + e.chain * 20, intensity);
+    }
+    if (engine === this.playerEngine) {
+      if (e.chain >= 2) haptic(HAPTIC.chain(e.chain));
+      else haptic(HAPTIC.match);
     }
   }
 

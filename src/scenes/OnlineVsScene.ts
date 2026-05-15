@@ -27,6 +27,7 @@ import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
 import { BLOCK_COLOR_HEX, BLOCK_SYMBOL, darken } from '@/config';
 import type { BoardSnapshot, OnlineMessage, OnlinePeer, OnlineRole } from '@/net/OnlinePeer';
+import { haptic, HAPTIC } from '@/utils/haptics';
 
 const VS_CELL_SIZE = 22;
 const GARBAGE_FILL = 0x666666;
@@ -545,12 +546,23 @@ export class OnlineVsScene extends Phaser.Scene {
     } else if (e.type === 'game.over') {
       // My engine topped out → I lose. Notify peer so they can call their win.
       this.peer.send({ kind: 'gameover', reason: 'topout' });
+      haptic(HAPTIC.gameOver);
       this.endMatch('lost', 'topout');
     } else if (e.type === 'block.swapped') {
       SFXPlayer.get().swap();
+      haptic(HAPTIC.swap);
     } else if (e.type === 'match.found') {
       SFXPlayer.get().clear(e.comboSize);
-      if (e.chain >= 2) SFXPlayer.get().chain(e.chain);
+      if (e.chain >= 2) {
+        SFXPlayer.get().chain(e.chain);
+        haptic(HAPTIC.chain(e.chain));
+        const intensity = Math.min(0.012, 0.004 + e.chain * 0.0015);
+        this.cameras.main.shake(100 + e.chain * 20, intensity);
+      } else {
+        haptic(HAPTIC.match);
+      }
+    } else if (e.type === 'garbage.dropped') {
+      haptic(HAPTIC.garbage);
     }
   }
 

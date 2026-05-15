@@ -7,6 +7,7 @@
  */
 
 import type { EmitFn, InputEventName } from './InputController';
+import { haptic, HAPTIC } from '@/utils/haptics';
 
 export interface VirtualButtonsOptions {
   container: HTMLElement;
@@ -273,13 +274,7 @@ export class VirtualButtons {
       ev.preventDefault();
       this.swapBtn.classList.add('is-pressed');
       this.emit('swap', {});
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate(15);
-        } catch {
-          // Ignored — vibrate isn't critical.
-        }
-      }
+      haptic(HAPTIC.swap);
     });
     const up = (): void => {
       this.swapBtn.classList.remove('is-pressed');

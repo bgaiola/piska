@@ -13,6 +13,7 @@
  */
 
 import type { EmitFn, InputAdapter, InputSource } from './InputController';
+import { haptic, HAPTIC } from '@/utils/haptics';
 
 export interface TouchAdapterOptions {
   canvas: HTMLElement;
@@ -90,13 +91,7 @@ export class TouchAdapter implements InputAdapter {
 
   private fireSwap(): void {
     this.emit('swap', {}, SOURCE);
-    if (this.haptics && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(15);
-      } catch {
-        // Some browsers throw if user hasn't interacted; ignore.
-      }
-    }
+    if (this.haptics) haptic(HAPTIC.swap);
   }
 
   private onPointerDown = (ev: PointerEvent): void => {
