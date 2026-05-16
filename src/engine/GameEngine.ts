@@ -330,8 +330,10 @@ export class GameEngine {
 
     // First pass: transition idle/landed blocks with an empty cell below to
     // 'falling'. Process bottom-to-top so a freshly-falling block won't keep
-    // the block above stuck.
-    for (let r = rows - 2; r >= 0; r--) {
+    // the block above stuck. INCLUDES the bottom row (r = rows-1) so blocks
+    // that landed there still transition 'landed' → 'idle' — otherwise the
+    // engine refuses to swap them since swap() rejects non-idle cells.
+    for (let r = rows - 1; r >= 0; r--) {
       for (let c = 0; c < cols; c++) {
         const cell = this.grid.get(r, c);
         if (cell === null) continue;
@@ -346,13 +348,13 @@ export class GameEngine {
         // the same width=1 vertical column footprint and the engine places
         // garbage onto the topmost empty rows, so single-row garbage drops
         // fine. For multi-row garbage we still rely on the second pass.
-        const below = this.grid.get(r + 1, c);
-        if (below === null) {
+        const canFall = r < rows - 1 && this.grid.get(r + 1, c) === null;
+        if (canFall) {
           cell.state = 'falling';
           cell.fallTimer = 0;
         } else if (cell.state === 'landed') {
           // 'landed' blocks tick over to 'idle' once they've had a moment to
-          // settle.
+          // settle. Critical for the bottom row, which used to be skipped.
           cell.state = 'idle';
         }
       }
