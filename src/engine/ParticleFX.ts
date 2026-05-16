@@ -20,6 +20,15 @@ import Phaser from 'phaser';
 // custom symbol-keyed field (which trips the parser in some TS configs).
 const emitterByScene = new WeakMap<Phaser.Scene, Phaser.GameObjects.Particles.ParticleEmitter>();
 
+// A second, slower emitter dedicated to the level-up sparkle effect. Sharing
+// the burst emitter would force us to re-config its lifespan / gravity /
+// scale per call, which fights the pooled-particle design. Keeping a
+// separate cache mirrors getEmitter() above.
+const sparkleEmitterByScene = new WeakMap<
+  Phaser.Scene,
+  Phaser.GameObjects.Particles.ParticleEmitter
+>();
+
 function getEmitter(
   scene: Phaser.Scene,
 ): Phaser.GameObjects.Particles.ParticleEmitter | null {
@@ -68,4 +77,65 @@ export function spawnClearBurst(
   const count = 3 + Math.floor(Math.random() * 3); // 3..5
   emitter.setParticleTint(color);
   emitter.emitParticleAt(x, y, count);
+}
+
+function getSparkleEmitter(
+  scene: Phaser.Scene,
+): Phaser.GameObjects.Particles.ParticleEmitter | null {
+  const cached = sparkleEmitterByScene.get(scene);
+  if (cached && cached.active) return cached;
+
+  if (!scene.textures.exists('pixel')) return null;
+
+  const emitter = scene.add.particles(0, 0, 'pixel', {
+    lifespan: 800,
+    // Gentle upward drift — slow speeds + negative gravity make the sparkles
+    // float instead of fly outward.
+    speedY: { min: -40, max: -10 },
+    speedX: { min: -20, max: 20 },
+    scale: { start: 1.2, end: 0 },
+    alpha: { start: 1, end: 0 },
+    gravityY: -30,
+    rotate: { min: 0, max: 360 },
+    emitting: false,
+  });
+  emitter.setDepth(9_100);
+
+  sparkleEmitterByScene.set(scene, emitter);
+
+  const teardown = (): void => {
+    emitter.destroy();
+    sparkleEmitterByScene.delete(scene);
+  };
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, teardown);
+  scene.events.once(Phaser.Scenes.Events.DESTROY, teardown);
+  return emitter;
+}
+
+/**
+ * Scatters 8-12 small white-to-cyan sparkle particles inside the rectangle
+ * (originX, originY, width, height) with a longer life and an upward drift.
+ *
+ * Intended for the level-up cue when the rise speed ramps up in Endless.
+ * Tint alternates between pure white and the block-cyan accent so the
+ * sparkles read as "magical" against any backdrop.
+ */
+export function spawnLevelUpSparkles(
+  scene: Phaser.Scene,
+  originX: number,
+  originY: number,
+  width: number,
+  height: number,
+): void {
+  const emitter = getSparkleEmitter(scene);
+  if (!emitter) return;
+  const count = 8 + Math.floor(Math.random() * 5); // 8..12
+  // White (0xffffff) and a bright cyan (0x9ff7ff) alternated per particle.
+  const tints = [0xffffff, 0x9ff7ff];
+  for (let i = 0; i < count; i++) {
+    const x = originX + Math.random() * Math.max(0, width);
+    const y = originY + Math.random() * Math.max(0, height);
+    emitter.setParticleTint(tints[i % tints.length]);
+    emitter.emitParticleAt(x, y, 1);
+  }
 }
