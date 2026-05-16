@@ -17,9 +17,16 @@ type Pattern = number | readonly number[];
 
 export function haptic(pattern: Pattern): void {
   if (typeof navigator === 'undefined') return;
-  if (!('vibrate' in navigator)) return;
+  // iOS Safari exposes `navigator.vibrate` as `undefined` (the property
+  // exists but isn't a function), so `'vibrate' in navigator` is true and
+  // calling it throws "vibrate is not a function". Check the type instead.
+  if (typeof navigator.vibrate !== 'function') return;
   if (!SaveManager.get().getVibration()) return;
-  navigator.vibrate(pattern as number | number[]);
+  try {
+    navigator.vibrate(pattern as number | number[]);
+  } catch {
+    /* swallow — haptics are cosmetic */
+  }
 }
 
 /** Convenience presets so call sites read intent, not magnitudes. */

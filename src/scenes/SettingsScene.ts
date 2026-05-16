@@ -644,7 +644,9 @@ export class SettingsScene extends Phaser.Scene {
   private toggleVibration(): void {
     const next = !SaveManager.get().getVibration();
     SaveManager.get().setVibration(next);
-    if (next && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    // iOS Safari defines the property but it's not a function — must check
+    // the type, not just presence, otherwise the test buzz throws.
+    if (next && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       try {
         navigator.vibrate(15);
       } catch {
