@@ -336,18 +336,22 @@ export class VsLocalScene extends Phaser.Scene {
       let x = originX;
       const pieces =
         queue ?? Array.from({ length: size }, () => ({ width: engine.cfg.cols, height: 1 }));
-      let totalDrawnW = 0;
-      pieces.forEach((p, idx) => {
-        const w = (p.width / engine.cfg.cols) * peekW;
+      const boardRight = originX + peekW;
+      for (let idx = 0; idx < pieces.length; idx++) {
+        const p = pieces[idx];
+        const w = Math.max(
+          2,
+          (p.width / engine.cfg.cols) *
+            (peekW / Math.max(1, Math.min(pieces.length, 6))),
+        );
+        if (x + w > boardRight) break;
         const h = stripH * Math.min(p.height, 2);
         g.fillStyle(idx === 0 ? 0xffaa44 : 0x8866cc, 0.95);
         g.fillRect(x, stripY - (h - stripH), w, h);
         g.lineStyle(1, 0x000000, 0.6);
         g.strokeRect(x, stripY - (h - stripH), w, h);
         x += w + gap;
-        totalDrawnW += w + gap;
-        if (totalDrawnW > peekW) return;
-      });
+      }
       const dropMs = engine.cfg.garbageDropDelayMs;
       const left = Math.max(0, engine.dropDelayTimer);
       const ratio = Math.min(1, left / dropMs);
