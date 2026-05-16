@@ -24,6 +24,7 @@ import Phaser from 'phaser';
 import { i18n, t, SUPPORTED_LOCALES, type Locale } from '@/i18n';
 import { BGMPlayer, SFXPlayer } from '@/audio';
 import { SaveManager } from '@/save/SaveManager';
+import { createBackButton, type BackButtonHandle } from '@/ui/BackButton';
 
 interface SettingsInit {
   returnTo?: string;
@@ -106,10 +107,18 @@ export class SettingsScene extends Phaser.Scene {
     this.drawScreen();
     this.bindInput();
 
+    this.backBtn = createBackButton({
+      scene: this,
+      label: '← VOLTAR',
+      onClick: () => this.goBack(),
+    });
+
     this.game.events.on('layout-changed', this.relayout, this);
     this.events.on('shutdown', () => this.cleanup());
     this.events.on('destroy', () => this.cleanup());
   }
+
+  private backBtn: BackButtonHandle | null = null;
 
   // ---------------------------------------------------------------------------
   // Layout
@@ -773,6 +782,8 @@ export class SettingsScene extends Phaser.Scene {
       window.removeEventListener('keydown', this.keyHandler);
       this.keyHandler = null;
     }
+    this.backBtn?.destroy();
+    this.backBtn = null;
     this.game.events.off('layout-changed', this.relayout, this);
     this.destroyRows();
     this.titleText?.destroy();

@@ -30,6 +30,7 @@ import { SaveManager } from '@/save/SaveManager';
 import { darken } from '@/config';
 import { CharacterPortrait } from '@/ui/CharacterPortrait';
 import type { GameMode } from '@/modes';
+import { createBackButton, type BackButtonHandle } from '@/ui/BackButton';
 
 const TILE_W = 76;
 const TILE_H = 76;
@@ -116,10 +117,17 @@ export class AdventureStageSelectScene extends Phaser.Scene {
     this.drawScreen();
     this.bindKeyboard();
 
+    this.backBtn = createBackButton({
+      scene: this,
+      onClick: () => this.back(),
+    });
+
     this.game.events.on('layout-changed', this.relayout, this);
     this.events.on('shutdown', () => this.cleanup());
     this.events.on('destroy', () => this.cleanup());
   }
+
+  private backBtn: BackButtonHandle | null = null;
 
   /**
    * Vertical gradient: dark neutral at the top fading to the world's
@@ -464,6 +472,8 @@ export class AdventureStageSelectScene extends Phaser.Scene {
     this.game.events.off('layout-changed', this.relayout, this);
     this.keyListeners.forEach(({ key, fn }) => window.removeEventListener(key, fn));
     this.keyListeners = [];
+    this.backBtn?.destroy();
+    this.backBtn = null;
     this.destroyTiles();
     this.destroyBanner();
     this.hintText?.destroy();

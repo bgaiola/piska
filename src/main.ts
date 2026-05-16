@@ -132,6 +132,18 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register(`${import.meta.env.BASE_URL}service-worker.js`)
+      .then((reg) => {
+        // When a fresh SW takes over (because the player already had the
+        // previous one running), reload once so the page picks up the new
+        // bundle hash without the player needing to do anything.
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
+        });
+        reg.update().catch(() => {});
+      })
       .catch(() => {});
   });
 }

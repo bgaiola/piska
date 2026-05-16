@@ -15,6 +15,7 @@
 
 import Phaser from 'phaser';
 import { BGMPlayer } from '@/audio';
+import { createBackButton, type BackButtonHandle } from '@/ui/BackButton';
 import {
   OnlinePeer,
   normalizeRoomCode,
@@ -59,10 +60,23 @@ export class OnlineLobbyScene extends Phaser.Scene {
     this.drawMenu();
     this.bindKeyboard();
 
+    this.backBtn = createBackButton({
+      scene: this,
+      onClick: () => {
+        if (this.step === 'menu') {
+          this.scene.start('ModeSelectScene');
+        } else {
+          this.cancelAndReturnToMenu();
+        }
+      },
+    });
+
     this.events.on('shutdown', () => this.cleanup());
     this.events.on('destroy', () => this.cleanup());
     this.game.events.on('layout-changed', this.relayout, this);
   }
+
+  private backBtn: BackButtonHandle | null = null;
 
   // ---------------------------------------------------------------------------
   // Step renderers
@@ -561,6 +575,8 @@ export class OnlineLobbyScene extends Phaser.Scene {
 
   private cleanup(): void {
     this.game.events.off('layout-changed', this.relayout, this);
+    this.backBtn?.destroy();
+    this.backBtn = null;
     if (this.keyHandler) {
       window.removeEventListener('keydown', this.keyHandler);
       this.keyHandler = null;

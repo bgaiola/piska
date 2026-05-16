@@ -29,6 +29,7 @@ import { getStagesForWorld } from '@/data/stages';
 import { SaveManager } from '@/save/SaveManager';
 import { darken } from '@/config';
 import { CharacterPortrait } from '@/ui/CharacterPortrait';
+import { createBackButton, type BackButtonHandle } from '@/ui/BackButton';
 
 interface WorldNode {
   worldId: WorldId;
@@ -69,10 +70,17 @@ export class AdventureMapScene extends Phaser.Scene {
     this.drawScreen();
     this.bindKeyboard();
 
+    this.backBtn = createBackButton({
+      scene: this,
+      onClick: () => this.back(),
+    });
+
     this.game.events.on('layout-changed', this.relayout, this);
     this.events.on('shutdown', () => this.cleanup());
     this.events.on('destroy', () => this.cleanup());
   }
+
+  private backBtn: BackButtonHandle | null = null;
 
   // ---------------------------------------------------------------------------
   // Rendering
@@ -376,6 +384,8 @@ export class AdventureMapScene extends Phaser.Scene {
     this.game.events.off('layout-changed', this.relayout, this);
     this.keyListeners.forEach(({ key, fn }) => window.removeEventListener(key, fn));
     this.keyListeners = [];
+    this.backBtn?.destroy();
+    this.backBtn = null;
     this.destroyNodes();
     this.titleText?.destroy();
     this.hintText?.destroy();

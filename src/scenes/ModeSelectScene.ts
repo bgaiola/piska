@@ -20,6 +20,7 @@ import { t, i18n } from '@/i18n';
 import type { AIDifficulty } from '@/engine/AIPlayer';
 import { PUZZLES } from '@/data/puzzles';
 import { SaveManager } from '@/save/SaveManager';
+import { createBackButton, type BackButtonHandle } from '@/ui/BackButton';
 
 type MenuMode = 'main' | 'vs-difficulty' | 'puzzle-picker';
 
@@ -72,6 +73,7 @@ export class ModeSelectScene extends Phaser.Scene {
   private titleText: Phaser.GameObjects.Text | null = null;
   private hintText: Phaser.GameObjects.Text | null = null;
   private gearButton: Phaser.GameObjects.Container | null = null;
+  private backBtn: BackButtonHandle | null = null;
   private shakeTween: Phaser.Tweens.Tween | null = null;
   private keyListeners: Array<{ key: 'keydown' | 'keyup'; fn: (e: KeyboardEvent) => void }> = [];
   private lastGamepadDownAt = 0;
@@ -138,6 +140,12 @@ export class ModeSelectScene extends Phaser.Scene {
       this.gearButton.destroy(true);
       this.gearButton = null;
     }
+    this.backBtn?.destroy();
+    this.backBtn = createBackButton({
+      scene: this,
+      label: this.mode === 'main' ? '← TÍTULO' : '← VOLTAR',
+      onClick: () => this.back(),
+    });
 
     const heading =
       this.mode === 'main'
@@ -580,6 +588,8 @@ export class ModeSelectScene extends Phaser.Scene {
       this.gearButton.destroy(true);
       this.gearButton = null;
     }
+    this.backBtn?.destroy();
+    this.backBtn = null;
     if (this.shakeTween) {
       this.shakeTween.stop();
       this.shakeTween = null;
