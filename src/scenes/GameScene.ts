@@ -422,10 +422,21 @@ export class GameScene extends Phaser.Scene {
 
   private setupAudio(): void {
     const bgm = BGMPlayer.get();
+    // In Adventure runs the stage knows which world it belongs to and
+    // every world has its own chiptune track. Outside Adventure (Endless,
+    // Time Attack, Stage Clear, Puzzle from the menu) we default to the
+    // pastoral world-1 theme, which is the most neutral.
+    const trackId = this.resolveAudioTrackId();
     bgm
       .unlock()
-      .then(() => bgm.play('world-1'))
+      .then(() => bgm.play(trackId))
       .catch(() => {});
+  }
+
+  private resolveAudioTrackId(): string {
+    if (!this.modeInit.adventureStageId) return 'world-1';
+    const stage = getStageById(this.modeInit.adventureStageId);
+    return stage ? `world-${stage.worldId}` : 'world-1';
   }
 
   // ---------------------------------------------------------------------------

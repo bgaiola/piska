@@ -38,6 +38,13 @@ interface SaveData {
     touchSide: 'right' | 'left';
   };
   adventure: AdventureSave;
+  /**
+   * True once the brand-new-player onboarding overlay has been shown (and
+   * either completed or skipped). Defaults to false so first-time players
+   * see it on their first gameplay scene. Added in fase 6 — old saves
+   * silently migrate to `false` via the deep-merge in `load()`.
+   */
+  onboardingSeen: boolean;
 }
 
 const STORAGE_KEY = 'piska.save.v1';
@@ -68,6 +75,7 @@ export class SaveManager {
         touchSide: 'right',
       },
       adventure: { stages: {}, completedWorlds: [] },
+      onboardingSeen: false,
     };
   }
 
@@ -92,6 +100,10 @@ export class SaveManager {
               ? parsedAdv.completedWorlds.slice()
               : [],
           },
+          // Onboarding flag added in fase 6 — preserve explicit `true`, but
+          // default to `false` so older saves still see the tutorial unless
+          // they've already passed through a new build that wrote the flag.
+          onboardingSeen: parsed.onboardingSeen === true,
         };
       }
     } catch {
@@ -168,6 +180,15 @@ export class SaveManager {
   }
   getTouchSide(): 'right' | 'left' {
     return this.data.settings.touchSide;
+  }
+
+  /** Has the player completed (or skipped) the first-run onboarding overlay? */
+  getOnboardingSeen(): boolean {
+    return this.data.onboardingSeen;
+  }
+  setOnboardingSeen(seen: boolean): void {
+    this.data.onboardingSeen = seen;
+    this.save();
   }
 
   // ---------------------------------------------------------------------------

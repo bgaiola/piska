@@ -113,7 +113,13 @@ export class VsScene extends Phaser.Scene {
     this.aiEngine = new GameEngine({ rngSeed: (baseSeed ^ 0xa11) & 0x7fffffff });
     this.ai = new AIPlayer(this.aiEngine, this.difficulty);
 
-    BGMPlayer.get().play('world-5');
+    // Adventure-mode duels play the host character's world track so each
+    // boss fight has its own theme; menu Vs-IA falls back to the volcanic
+    // Forja Vulcânica anthem.
+    const vsTrack = this.adventureStage
+      ? `world-${this.adventureStage.worldId}`
+      : 'world-5';
+    BGMPlayer.get().play(vsTrack);
 
     this.cameras.main.setBackgroundColor('#08030f');
     this.drawBackdrop();

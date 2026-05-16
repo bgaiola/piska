@@ -26,27 +26,35 @@ export class HUDScene extends Phaser.Scene {
   create(): void {
     const w = this.scale.gameSize.width;
 
-    this.add.rectangle(0, 0, w, 28, 0x000000, 0.6).setOrigin(0, 0);
+    // Solid dark bar with a 1px amber underline so the top of the screen
+    // reads as a real status panel, not a vague translucent strip.
+    this.add.rectangle(0, 0, w, 32, 0x0b0418, 1).setOrigin(0, 0);
+    this.add.rectangle(0, 32, w, 1, 0x553a18, 1).setOrigin(0, 0);
 
-    this.scoreText = this.add.text(8, 6, 'SCORE 0', {
+    this.scoreText = this.add.text(10, 8, 'SCORE 0', {
       fontFamily: 'monospace',
-      fontSize: '12px',
-      color: '#ffe',
+      fontSize: '13px',
+      color: '#ffe6a8',
+      fontStyle: 'bold',
     });
 
     this.chainText = this.add
-      .text(w / 2, 6, '', {
+      .text(w / 2, 8, '', {
         fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#ff8',
+        fontSize: '14px',
+        color: '#ffaa44',
+        fontStyle: 'bold',
+        stroke: '#3a1a08',
+        strokeThickness: 2,
       })
       .setOrigin(0.5, 0);
 
     this.garbageText = this.add
-      .text(w - 8, 6, '', {
+      .text(w - 10, 8, '', {
         fontFamily: 'monospace',
         fontSize: '12px',
-        color: '#f9c',
+        color: '#f88aa0',
+        fontStyle: 'bold',
       })
       .setOrigin(1, 0);
 
@@ -54,6 +62,14 @@ export class HUDScene extends Phaser.Scene {
       if (e.type === 'match.found' && e.chain >= 2) {
         this.chainText.setText(`CHAIN x${e.chain}!`);
         this.chainTimer = 1200;
+        // Pop the chain text so the player can't miss it.
+        this.chainText.setScale(0.85);
+        this.tweens.add({
+          targets: this.chainText,
+          scale: 1.0,
+          duration: 180,
+          ease: 'Back.easeOut',
+        });
       }
     });
 
