@@ -25,7 +25,7 @@ import {
 import { setupDefaultInputs } from '@/engine/input/setupDefaultInputs';
 import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
-import { BLOCK_SIZE_LOGICAL } from '@/config';
+import { BLOCK_COLOR_HEX, BLOCK_SYMBOL, darken } from '@/config';
 import type { BoardSnapshot, OnlineMessage, OnlinePeer, OnlineRole } from '@/net/OnlinePeer';
 import { haptic, HAPTIC } from '@/utils/haptics';
 
@@ -438,12 +438,24 @@ export class OnlineVsScene extends Phaser.Scene {
     alpha: number,
     flashWhite: boolean,
   ): void {
-    const baseScale = cellSize / BLOCK_SIZE_LOGICAL;
-    const sprite = this.add.image(cx, cy, `block-${color}`);
-    sprite.setAlpha(alpha);
-    sprite.setScale(baseScale * scale);
-    if (flashWhite) sprite.setTintFill(0xffffff);
-    container.add(sprite);
+    const fillColor = flashWhite ? 0xffffff : BLOCK_COLOR_HEX[color];
+    const outlineColor = darken(BLOCK_COLOR_HEX[color], 0.5);
+    const rect = this.add.rectangle(cx, cy, cellSize - 2, cellSize - 2, fillColor, alpha);
+    rect.setStrokeStyle(1, outlineColor, alpha);
+    rect.setScale(scale);
+
+    const label = this.add
+      .text(cx, cy, BLOCK_SYMBOL[color], {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: this.symbolColorFor(color),
+      })
+      .setOrigin(0.5)
+      .setAlpha(alpha)
+      .setScale(scale);
+
+    container.add(rect);
+    container.add(label);
   }
 
   private drawGarbageCell(
@@ -487,6 +499,17 @@ export class OnlineVsScene extends Phaser.Scene {
     const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 180);
     g.lineStyle(2, 0xffffee, pulse);
     g.strokeRect(x, y, w, h);
+  }
+
+  private symbolColorFor(color: BlockColor): string {
+    switch (color) {
+      case 'yellow':
+      case 'cyan':
+      case 'green':
+        return '#1a0f1f';
+      default:
+        return '#ffffff';
+    }
   }
 
   // ---------------------------------------------------------------------------

@@ -62,9 +62,15 @@ export class VirtualButtons {
     this.raiseBtn.style.width = '64px';
     this.raiseBtn.style.height = '64px';
 
-    this.pauseBtn = this.makeButton('II', ['piska-vb', 'piska-vb-pause']);
-    this.pauseBtn.style.width = '40px';
+    // Labelled "MENU" instead of an abstract pause icon so phone players
+    // discover the quit/settings flow without having to guess that "II"
+    // also opens an exit menu.
+    this.pauseBtn = this.makeButton('MENU', ['piska-vb', 'piska-vb-pause']);
+    this.pauseBtn.style.width = '64px';
     this.pauseBtn.style.height = '40px';
+    this.pauseBtn.style.fontSize = '12px';
+    this.pauseBtn.style.fontWeight = 'bold';
+    this.pauseBtn.style.letterSpacing = '1px';
 
     this.dpadRoot = document.createElement('div');
     this.dpadRoot.className = 'piska-vb-dpad';

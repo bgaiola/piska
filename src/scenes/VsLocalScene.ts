@@ -23,9 +23,9 @@
 
 import Phaser from 'phaser';
 import { GameEngine } from '@/engine';
-import type { Block, EngineEvent } from '@/engine';
+import type { Block, BlockColor, EngineEvent } from '@/engine';
 import { BGMPlayer, SFXPlayer } from '@/audio';
-import { BLOCK_COLOR_HEX, BLOCK_SIZE_LOGICAL } from '@/config';
+import { BLOCK_COLOR_HEX, BLOCK_SYMBOL, darken } from '@/config';
 import { ChainPopup } from '@/ui/ChainPopup';
 import { spawnClearBurst } from '@/engine/ParticleFX';
 import { haptic, HAPTIC } from '@/utils/haptics';
@@ -394,12 +394,38 @@ export class VsLocalScene extends Phaser.Scene {
       return;
     }
 
-    const baseScale = cellSize / BLOCK_SIZE_LOGICAL;
-    const sprite = this.add.image(cx, cy, `block-${block.color}`);
-    sprite.setAlpha(alpha);
-    sprite.setScale(baseScale * scale);
-    if (flashWhite) sprite.setTintFill(0xffffff);
-    container.add(sprite);
+    const fillColor = flashWhite
+      ? 0xffffff
+      : BLOCK_COLOR_HEX[block.color as BlockColor];
+    const outlineColor = darken(BLOCK_COLOR_HEX[block.color as BlockColor], 0.5);
+
+    const rect = this.add.rectangle(cx, cy, cellSize - 2, cellSize - 2, fillColor, alpha);
+    rect.setStrokeStyle(1, outlineColor, alpha);
+    rect.setScale(scale);
+
+    const label = this.add
+      .text(cx, cy, BLOCK_SYMBOL[block.color as BlockColor], {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: this.symbolColorFor(block.color),
+      })
+      .setOrigin(0.5)
+      .setAlpha(alpha)
+      .setScale(scale);
+
+    container.add(rect);
+    container.add(label);
+  }
+
+  private symbolColorFor(color: BlockColor): string {
+    switch (color) {
+      case 'yellow':
+      case 'cyan':
+      case 'green':
+        return '#1a0f1f';
+      default:
+        return '#ffffff';
+    }
   }
 
   private drawGarbageCell(
