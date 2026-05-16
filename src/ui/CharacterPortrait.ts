@@ -15,7 +15,12 @@
  */
 
 import Phaser from 'phaser';
-import { CHARACTERS, type CharacterId, type Mood } from '@/data/characters';
+import {
+  CHARACTERS,
+  type CharacterDef,
+  type CharacterId,
+  type Mood,
+} from '@/data/characters';
 import { darken } from '@/config';
 
 export interface CharacterPortraitOptions {
@@ -62,6 +67,12 @@ export class CharacterPortrait {
     const cheekR2 = scene.add
       .circle(Math.floor(size * 0.22), cheekY, cheekR, def.accentColor, 0.55);
     container.add([cheekL, cheekR2]);
+
+    // Species-distinguishing features (ears, horns, tentacles…) drawn once
+    // beneath the face layer so they're not redrawn on mood change.
+    const features = scene.add.graphics();
+    container.add(features);
+    this.drawFeatures(features, def);
 
     // Face graphics (eyes + mouth) — redrawn whenever mood changes.
     this.faceGfx = scene.add.graphics();
@@ -168,5 +179,126 @@ export class CharacterPortrait {
       6,
       6,
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // Internal: per-character species features
+  // -------------------------------------------------------------------------
+
+  private drawFeatures(g: Phaser.GameObjects.Graphics, def: CharacterDef): void {
+    const s = this.size;
+    const half = s / 2;
+    const primary = def.primaryColor;
+    const accent = def.accentColor;
+    const ink = 0x1a0f1f;
+
+    switch (this.characterId) {
+      case 'pim': {
+        // Two pointed fox ears on top, accent-coloured inner triangles.
+        const earY = -half + 2;
+        const earSpan = s * 0.18;
+        const earH = s * 0.28;
+        g.fillStyle(primary, 1);
+        g.fillTriangle(-earSpan - 8, earY + earH, -earSpan + 8, earY + earH, -earSpan, earY);
+        g.fillTriangle(earSpan - 8, earY + earH, earSpan + 8, earY + earH, earSpan, earY);
+        g.fillStyle(accent, 1);
+        g.fillTriangle(-earSpan - 4, earY + earH - 2, -earSpan + 4, earY + earH - 2, -earSpan, earY + 6);
+        g.fillTriangle(earSpan - 4, earY + earH - 2, earSpan + 4, earY + earH - 2, earSpan, earY + 6);
+        // Snout patch under the mouth.
+        g.fillStyle(0xfff0e2, 1);
+        g.fillRoundedRect(-s * 0.18, s * 0.1, s * 0.36, s * 0.22, 4);
+        break;
+      }
+      case 'salla': {
+        // Saw-tooth crest along the top, three peaks. Snout patch on the right.
+        const crestY = -half - 2;
+        g.fillStyle(accent, 1);
+        g.fillTriangle(-s * 0.22, -half + 4, -s * 0.06, -half + 4, -s * 0.14, crestY - 4);
+        g.fillTriangle(-s * 0.04, -half + 4, s * 0.12, -half + 4, s * 0.04, crestY - 6);
+        g.fillTriangle(s * 0.14, -half + 4, s * 0.3, -half + 4, s * 0.22, crestY - 4);
+        // Snout patch.
+        g.fillStyle(0xffe9a8, 1);
+        g.fillRoundedRect(-s * 0.2, s * 0.08, s * 0.4, s * 0.2, 5);
+        // Forked tongue tip.
+        g.fillStyle(0xff5577, 1);
+        g.fillRect(s * 0.18, s * 0.22, s * 0.1, 2);
+        break;
+      }
+      case 'boreal': {
+        // Curved goat horns + thin chin beard.
+        g.lineStyle(3, accent, 1);
+        g.beginPath();
+        g.arc(-s * 0.22, -half + 8, s * 0.18, Math.PI * 0.1, Math.PI * 0.9, true);
+        g.strokePath();
+        g.beginPath();
+        g.arc(s * 0.22, -half + 8, s * 0.18, Math.PI * 0.1, Math.PI * 0.9, true);
+        g.strokePath();
+        // Snowy beard.
+        g.fillStyle(0xe8f4ff, 1);
+        g.fillTriangle(-s * 0.06, s * 0.22, s * 0.06, s * 0.22, 0, s * 0.42);
+        break;
+      }
+      case 'murena': {
+        // Five tentacles dangling below the head area.
+        g.fillStyle(primary, 1);
+        const baseY = s * 0.28;
+        const tx = [-s * 0.32, -s * 0.16, 0, s * 0.16, s * 0.32];
+        for (const x of tx) {
+          g.fillRoundedRect(x - 4, baseY, 8, s * 0.22, { tl: 0, tr: 0, bl: 4, br: 4 });
+        }
+        // Round glasses on top of the eyes layer (drawn here as colored rings;
+        // the eye dots in drawFace render inside them).
+        g.lineStyle(2, ink, 1);
+        const eyeY = -s * 0.08;
+        g.strokeCircle(-s * 0.18, eyeY, 9);
+        g.strokeCircle(s * 0.18, eyeY, 9);
+        g.lineBetween(-s * 0.09, eyeY, s * 0.09, eyeY);
+        break;
+      }
+      case 'brasa': {
+        // Two small dragon horns on top, scaled belly patch, and a tiny flame
+        // licking out of the side of the mouth.
+        g.fillStyle(accent, 1);
+        g.fillTriangle(-s * 0.2, -half + 2, -s * 0.1, -half + 2, -s * 0.15, -half - 10);
+        g.fillTriangle(s * 0.1, -half + 2, s * 0.2, -half + 2, s * 0.15, -half - 10);
+        // Belly scale band — three darker stripes.
+        g.fillStyle(darken(primary, 0.25), 1);
+        for (let i = 0; i < 3; i++) {
+          g.fillRect(-s * 0.24, s * 0.25 + i * 5, s * 0.48, 2);
+        }
+        // Flame.
+        g.fillStyle(0xffaa33, 1);
+        g.fillTriangle(s * 0.28, s * 0.06, s * 0.4, s * 0.16, s * 0.3, s * 0.2);
+        g.fillStyle(0xffe85c, 1);
+        g.fillTriangle(s * 0.3, s * 0.1, s * 0.36, s * 0.16, s * 0.32, s * 0.18);
+        break;
+      }
+      case 'aura': {
+        // Pointy fairy ears, two antenna-tips, four little sparkles.
+        g.fillStyle(primary, 1);
+        g.fillTriangle(-half + 4, -s * 0.1, -half + 4, s * 0.05, -half - 6, -s * 0.02);
+        g.fillTriangle(half - 4, -s * 0.1, half - 4, s * 0.05, half + 6, -s * 0.02);
+        // Antennae with bulbs.
+        g.lineStyle(2, accent, 1);
+        g.lineBetween(-s * 0.08, -half + 6, -s * 0.12, -half - 8);
+        g.lineBetween(s * 0.08, -half + 6, s * 0.12, -half - 8);
+        g.fillStyle(0xffe9a8, 1);
+        g.fillCircle(-s * 0.12, -half - 10, 3);
+        g.fillCircle(s * 0.12, -half - 10, 3);
+        // Sparkles around the head.
+        g.fillStyle(0xffffff, 1);
+        const sparkles: Array<[number, number]> = [
+          [-half - 8, -s * 0.25],
+          [half + 8, -s * 0.18],
+          [-half - 4, s * 0.12],
+          [half + 4, s * 0.06],
+        ];
+        for (const [x, y] of sparkles) {
+          g.fillRect(x - 1, y, 3, 1);
+          g.fillRect(x, y - 1, 1, 3);
+        }
+        break;
+      }
+    }
   }
 }
