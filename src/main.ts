@@ -11,6 +11,7 @@ import { BootScene } from '@/scenes/BootScene';
 import { PreloadScene } from '@/scenes/PreloadScene';
 import { TitleScene } from '@/scenes/TitleScene';
 import { ModeSelectScene } from '@/scenes/ModeSelectScene';
+import { OnboardingScene } from '@/scenes/OnboardingScene';
 import { SettingsScene } from '@/scenes/SettingsScene';
 import { GameScene } from '@/scenes/GameScene';
 import { HUDScene } from '@/scenes/HUDScene';
@@ -105,6 +106,7 @@ const game = new Phaser.Game({
     PreloadScene,
     TitleScene,
     ModeSelectScene,
+    OnboardingScene,
     SettingsScene,
     GameScene,
     HUDScene,

@@ -134,6 +134,20 @@ const dict: TranslationDict = {
   'settings.lang.en': 'English',
   'settings.hint': '↑↓ Navigate  •  ←→ Adjust  •  Enter Confirm  •  Esc Back',
 
+  // Onboarding (first-run tutorial overlay)
+  'onboarding.slide1.title': 'Swap blocks',
+  'onboarding.slide1.body':
+    'Tap a pair of side-by-side blocks to swap them. Line up 3 or more of the same color to clear them.',
+  'onboarding.slide2.title': 'Chain combos',
+  'onboarding.slide2.body':
+    'When blocks fall onto a match, they chain! Chains are worth way more points.',
+  'onboarding.slide3.title': 'Watch the top',
+  'onboarding.slide3.body':
+    'The blocks keep rising. Don\'t let them reach the top. Press R to force a rise whenever you want.',
+  'onboarding.skip': 'Skip',
+  'onboarding.next': 'Next',
+  'onboarding.start': 'Start playing!',
+
   // Common
   'common.back': 'Back',
   'common.confirm': 'Confirm',

@@ -136,6 +136,20 @@ const dict: TranslationDict = {
   'settings.lang.en': 'English',
   'settings.hint': '↑↓ Navegar  •  ←→ Ajustar  •  Enter Confirmar  •  Esc Voltar',
 
+  // Onboarding (first-run tutorial overlay)
+  'onboarding.slide1.title': 'Troque blocos',
+  'onboarding.slide1.body':
+    'Toque em um par de blocos do lado para trocar. Combine 3 ou mais da mesma cor para limpar.',
+  'onboarding.slide2.title': 'Encadeie chains',
+  'onboarding.slide2.body':
+    'Quando blocos caem em cima de uma combinação, eles encadeiam! Chains valem muito mais pontos.',
+  'onboarding.slide3.title': 'Cuidado com o topo',
+  'onboarding.slide3.body':
+    'Os blocos sobem o tempo todo. Não deixe alcançar o topo. Use o botão R para forçar uma subida quando quiser.',
+  'onboarding.skip': 'Pular',
+  'onboarding.next': 'Próximo',
+  'onboarding.start': 'Começar a jogar!',
+
   // Common
   'common.back': 'Voltar',
   'common.confirm': 'Confirmar',

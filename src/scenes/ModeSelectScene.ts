@@ -19,6 +19,7 @@ import { BGMPlayer } from '@/audio';
 import { t, i18n } from '@/i18n';
 import type { AIDifficulty } from '@/engine/AIPlayer';
 import { PUZZLES } from '@/data/puzzles';
+import { SaveManager } from '@/save/SaveManager';
 
 type MenuMode = 'main' | 'vs-difficulty' | 'puzzle-picker';
 
@@ -443,6 +444,25 @@ export class ModeSelectScene extends Phaser.Scene {
       if (spec.disabled) {
         this.shakeCard(card);
         return;
+      }
+      // First-run players land in the tutorial overlay regardless of which
+      // mode they picked. The Onboarding scene flips the SaveManager flag
+      // and routes them into Endless when they finish or skip. Sub-pickers
+      // (vs-difficulty, puzzle-picker) aren't real gameplay so we don't
+      // gate them here.
+      if (!SaveManager.get().getOnboardingSeen()) {
+        switch (spec.key) {
+          case 'adventure':
+          case 'endless':
+          case 'time-attack':
+          case 'stage-clear':
+          case 'vs-local':
+          case 'vs-online':
+            this.scene.start('OnboardingScene');
+            return;
+          default:
+            break;
+        }
       }
       switch (spec.key) {
         case 'adventure':
