@@ -59,7 +59,13 @@ export class PauseScene extends Phaser.Scene {
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
 
-    this.add.rectangle(0, 0, w, h, 0x000000, 0.72).setOrigin(0, 0);
+    // Full opaque panel so the paused playfield doesn't visually compete
+    // with the menu (we used to use 0.72 alpha; result panels are also
+    // fully opaque now for the same reason).
+    this.add.rectangle(0, 0, w, h, 0x10081a, 1).setOrigin(0, 0);
+    // Subtle vignette top + bottom so the title + buttons feel framed.
+    this.add.rectangle(0, 0, w, 24, 0x000000, 0.35).setOrigin(0, 0);
+    this.add.rectangle(0, h - 24, w, 24, 0x000000, 0.35).setOrigin(0, 0);
 
     this.add
       .text(w / 2, h * 0.32, t('pause.title'), {

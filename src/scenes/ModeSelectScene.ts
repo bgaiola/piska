@@ -86,7 +86,8 @@ export class ModeSelectScene extends Phaser.Scene {
     // already did that on first gesture.
     BGMPlayer.get().play('title');
 
-    this.cameras.main.setBackgroundColor('#150a1c');
+    this.cameras.main.setBackgroundColor('#08030f');
+    this.drawBackdrop();
 
     this.drawScreen();
     this.bindKeyboard();
@@ -102,6 +103,27 @@ export class ModeSelectScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
   // Rendering
   // ---------------------------------------------------------------------------
+
+  private drawBackdrop(): void {
+    const w = this.scale.gameSize.width;
+    const h = this.scale.gameSize.height;
+    const g = this.add.graphics();
+    // Soft amethyst → plum gradient so the mode-pick screen reads as a
+    // foyer to the game rather than a flat menu.
+    const stops = [
+      0x10061e, 0x150924, 0x1a0b2a, 0x1d0c30, 0x210d34, 0x250e38,
+      0x290e3a, 0x2a0d3a, 0x290c36, 0x260b30, 0x21092a, 0x1b0824,
+    ];
+    const stripeH = Math.ceil(h / stops.length);
+    for (let i = 0; i < stops.length; i++) {
+      g.fillStyle(stops[i], 1);
+      g.fillRect(0, i * stripeH, w, stripeH + 1);
+    }
+    g.fillStyle(0x000000, 0.35);
+    g.fillRect(0, 0, w, 24);
+    g.fillRect(0, h - 24, w, 24);
+    g.setDepth(-1000);
+  }
 
   private drawScreen(): void {
     this.destroyCards();

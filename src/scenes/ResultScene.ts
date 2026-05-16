@@ -36,7 +36,9 @@ export class ResultScene extends Phaser.Scene {
   create(): void {
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
-    this.add.rectangle(0, 0, w, h, 0x000000, 0.78).setOrigin(0, 0);
+    this.add.rectangle(0, 0, w, h, 0x10081a, 1).setOrigin(0, 0);
+    this.add.rectangle(0, 0, w, 24, 0x000000, 0.35).setOrigin(0, 0);
+    this.add.rectangle(0, h - 24, w, 24, 0x000000, 0.35).setOrigin(0, 0);
 
     // Header
     this.add

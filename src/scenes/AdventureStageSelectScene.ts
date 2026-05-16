@@ -11,14 +11,24 @@
  *
  * Stage unlock rule (mirrors SaveManager.isStageUnlocked): stage 1 is always
  * playable; stage N requires the previous stage to have ≥1 star.
+ *
+ * Polish layer:
+ *   - drawBackdrop() paints a 12-stripe vertical gradient that fades from
+ *     a dark neutral at the top to the selected world's `themeColor` at the
+ *     bottom, so the scene feels like the world itself (Vale do Carvalho →
+ *     green-tinted, Pico Geada → ice-blue, ...).
+ *   - The top of the scene gets a "world banner" with a CharacterPortrait
+ *     on the left, the world name in large type, and the tagline below.
  */
 
 import Phaser from 'phaser';
 import { BGMPlayer } from '@/audio';
 import { WORLDS, type WorldId } from '@/data/worlds';
+import { CHARACTER_BY_WORLD, CHARACTERS } from '@/data/characters';
 import { getStagesForWorld, type StageDef } from '@/data/stages';
 import { SaveManager } from '@/save/SaveManager';
 import { darken } from '@/config';
+import { CharacterPortrait } from '@/ui/CharacterPortrait';
 import type { GameMode } from '@/modes';
 
 const TILE_W = 76;
@@ -27,6 +37,8 @@ const TILE_GAP = 8;
 
 const FOCUS_COLOR = 0xffeecc;
 const UNFOCUS_COLOR = 0x777777;
+
+const BANNER_H = 88;
 
 const MODE_GLYPH: Record<GameMode, string> = {
   endless: '∞',
@@ -56,12 +68,32 @@ interface StageTile {
   unlocked: boolean;
 }
 
+/**
+ * Lerps between two 0xRRGGBB ints. Cheaper than parsing colors and lets
+ * drawBackdrop build a gradient between an arbitrary "top" neutral and the
+ * world's themeColor at the bottom.
+ */
+function lerpHex(a: number, b: number, t: number): number {
+  const ar = (a >> 16) & 0xff;
+  const ag = (a >> 8) & 0xff;
+  const ab = a & 0xff;
+  const br = (b >> 16) & 0xff;
+  const bg = (b >> 8) & 0xff;
+  const bb = b & 0xff;
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bch = Math.round(ab + (bb - ab) * t);
+  return (r << 16) | (g << 8) | bch;
+}
+
 export class AdventureStageSelectScene extends Phaser.Scene {
   private worldId: WorldId = 1;
   private cursor = 0;
   private cols = 3;
   private tiles: StageTile[] = [];
-  private titleText: Phaser.GameObjects.Text | null = null;
+  private backdropGfx: Phaser.GameObjects.Graphics | null = null;
+  private bannerObjects: Phaser.GameObjects.GameObject[] = [];
+  private bannerPortrait: CharacterPortrait | null = null;
   private hintText: Phaser.GameObjects.Text | null = null;
   private detailText: Phaser.GameObjects.Text | null = null;
   private keyListeners: Array<{ key: 'keydown'; fn: (e: KeyboardEvent) => void }> = [];
@@ -80,6 +112,7 @@ export class AdventureStageSelectScene extends Phaser.Scene {
     BGMPlayer.get().play(wdef.trackId);
     this.cameras.main.setBackgroundColor('#0c0418');
 
+    this.drawBackdrop();
     this.drawScreen();
     this.bindKeyboard();
 
@@ -88,31 +121,117 @@ export class AdventureStageSelectScene extends Phaser.Scene {
     this.events.on('destroy', () => this.cleanup());
   }
 
+  /**
+   * Vertical gradient: dark neutral at the top fading to the world's
+   * `themeColor` at the bottom. 12 stripes give it depth without per-pixel
+   * work. Drawn once at depth -1000.
+   */
+  private drawBackdrop(): void {
+    this.backdropGfx?.destroy();
+    const w = this.scale.gameSize.width;
+    const h = this.scale.gameSize.height;
+    const wdef = WORLDS[this.worldId];
+    const g = this.add.graphics();
+
+    const top = 0x0c0418; // matches the camera background
+    // Bottom stop is the world's themeColor, but darkened a notch so the
+    // grid tiles (which use a darker shade of the same colour) still stand
+    // apart from the backdrop.
+    const bottom = darken(wdef.themeColor, 0.35);
+
+    const STRIPES = 12;
+    const stripeH = Math.ceil(h / STRIPES);
+    for (let i = 0; i < STRIPES; i++) {
+      const t = i / (STRIPES - 1);
+      const color = lerpHex(top, bottom, t);
+      g.fillStyle(color, 1);
+      g.fillRect(0, i * stripeH, w, stripeH + 1);
+    }
+    // Top + bottom vignette stripes, same recipe as the other scenes.
+    g.fillStyle(0x000000, 0.35);
+    g.fillRect(0, 0, w, 22);
+    g.fillRect(0, h - 22, w, 22);
+    g.setDepth(-1000);
+    this.backdropGfx = g;
+  }
+
   private drawScreen(): void {
     this.destroyTiles();
+    this.destroyBanner();
 
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
     const wdef = WORLDS[this.worldId];
     const save = SaveManager.get();
     const stages = getStagesForWorld(this.worldId);
+    const char = CHARACTERS[CHARACTER_BY_WORLD[this.worldId]];
 
-    this.titleText?.destroy();
-    this.titleText = this.add
-      .text(w / 2, 22, `Mundo ${this.worldId} — ${wdef.name}`, {
+    // ----- World banner ------------------------------------------------------
+    // A horizontal band at the top with the portrait, world title, tagline,
+    // and "Mundo N" label. Anchors centre-X. Keeps the cards below uncluttered.
+    const bannerCy = 12 + BANNER_H / 2;
+    const portraitSize = 56;
+    const portraitX = Math.max(36, Math.floor(w / 2) - 130);
+
+    this.bannerPortrait = new CharacterPortrait({
+      scene: this,
+      x: portraitX,
+      y: bannerCy,
+      characterId: CHARACTER_BY_WORLD[this.worldId],
+      size: portraitSize,
+      showLabel: false,
+    });
+
+    const textX = portraitX + portraitSize / 2 + 12;
+    const mundoLabel = this.add
+      .text(textX, bannerCy - 24, `Mundo ${this.worldId}`, {
         fontFamily: 'monospace',
-        fontSize: '15px',
-        color: '#ffe',
+        fontSize: '10px',
+        color: '#ffd96b',
       })
-      .setOrigin(0.5);
+      .setOrigin(0, 0.5);
+    this.bannerObjects.push(mundoLabel);
 
+    const nameText = this.add
+      .text(textX, bannerCy - 8, wdef.name, {
+        fontFamily: 'monospace',
+        fontSize: '18px',
+        color: '#ffe',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0, 0.5);
+    this.bannerObjects.push(nameText);
+
+    const taglineText = this.add
+      .text(textX, bannerCy + 12, wdef.tagline, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#bbf',
+        wordWrap: { width: w - textX - 24 },
+      })
+      .setOrigin(0, 0.5);
+    this.bannerObjects.push(taglineText);
+
+    const hostText = this.add
+      .text(textX, bannerCy + 28, char.name, {
+        fontFamily: 'monospace',
+        fontSize: '9px',
+        color: '#ff8',
+      })
+      .setOrigin(0, 0.5);
+    this.bannerObjects.push(hostText);
+
+    // ----- Stage grid --------------------------------------------------------
     // Fit columns to viewport (3 default, drop to 2 on very narrow).
     this.cols = w < 320 ? 2 : 3;
     const rows = Math.ceil(stages.length / this.cols);
     const gridW = this.cols * TILE_W + (this.cols - 1) * TILE_GAP;
     const gridH = rows * TILE_H + (rows - 1) * TILE_GAP;
+    const gridTop = bannerCy + BANNER_H / 2 + 12;
+    const gridFooter = 56; // detail + hint
     const startX = Math.floor((w - gridW) / 2) + TILE_W / 2;
-    const startY = 56 + Math.max(0, Math.floor((h - 110 - gridH) / 2));
+    const startY =
+      gridTop + Math.max(0, Math.floor((h - gridTop - gridFooter - gridH) / 2));
 
     stages.forEach((stage, idx) => {
       const r = Math.floor(idx / this.cols);
@@ -325,6 +444,7 @@ export class AdventureStageSelectScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   private relayout(): void {
+    this.drawBackdrop();
     this.drawScreen();
   }
 
@@ -333,16 +453,24 @@ export class AdventureStageSelectScene extends Phaser.Scene {
     this.tiles = [];
   }
 
+  private destroyBanner(): void {
+    this.bannerObjects.forEach((o) => o.destroy());
+    this.bannerObjects = [];
+    this.bannerPortrait?.destroy();
+    this.bannerPortrait = null;
+  }
+
   private cleanup(): void {
     this.game.events.off('layout-changed', this.relayout, this);
     this.keyListeners.forEach(({ key, fn }) => window.removeEventListener(key, fn));
     this.keyListeners = [];
     this.destroyTiles();
-    this.titleText?.destroy();
+    this.destroyBanner();
     this.hintText?.destroy();
     this.detailText?.destroy();
-    this.titleText = null;
     this.hintText = null;
     this.detailText = null;
+    this.backdropGfx?.destroy();
+    this.backdropGfx = null;
   }
 }
