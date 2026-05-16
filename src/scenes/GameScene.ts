@@ -78,7 +78,7 @@ export class GameScene extends Phaser.Scene {
   private controllerOffs: Array<() => void> = [];
   private inputCtrlDestroy: (() => void) | null = null;
   private resultLaunched = false;
-  private readonly cellSize = BLOCK_SIZE_LOGICAL;
+  private cellSize = BLOCK_SIZE_LOGICAL;
   // Tween-driven scale read by drawCursor() each frame so the outline
   // breathes alongside the sine-wave alpha pulse.
   private cursorScale = 1;
@@ -104,6 +104,9 @@ export class GameScene extends Phaser.Scene {
     this.applyModeLayout();
 
     this.mode = this.buildMode();
+
+    this.cameras.main.setBackgroundColor('#08030f');
+    this.drawBackdrop();
 
     this.computeBoardOrigin();
 
@@ -575,15 +578,49 @@ export class GameScene extends Phaser.Scene {
   // Coordinate helpers
   // ---------------------------------------------------------------------------
 
+  private drawBackdrop(): void {
+    const w = this.scale.gameSize.width;
+    const h = this.scale.gameSize.height;
+    const g = this.add.graphics();
+    // Deep indigo top → warm dawn bottom, evoking the dedicatória's "esqueceu
+    // de piscar" twilight. Used by every solo mode so the playfield has more
+    // identity than flat black.
+    const stops = [
+      0x0e0420, 0x140628, 0x180830, 0x1d0a37, 0x230d3d, 0x281143,
+      0x2e1547, 0x331848, 0x381844, 0x3a163d, 0x3a1334, 0x35102c,
+    ];
+    const stripeH = Math.ceil(h / stops.length);
+    for (let i = 0; i < stops.length; i++) {
+      g.fillStyle(stops[i], 1);
+      g.fillRect(0, i * stripeH, w, stripeH + 1);
+    }
+    // Top/bottom vignette so the playfield reads as the main focal point.
+    g.fillStyle(0x000000, 0.35);
+    g.fillRect(0, 0, w, 24);
+    g.fillRect(0, h - 24, w, 24);
+    g.setDepth(-1000);
+  }
+
   private computeBoardOrigin(): void {
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
-    const boardW = this.engine.grid.cols * this.cellSize;
-    const boardH = this.engine.grid.rows * this.cellSize;
-    // 20px vertical offset accounts for the HUD strip at the top.
+    const cols = this.engine.grid.cols;
+    const rows = this.engine.grid.rows;
+
+    // Scale the cellSize so the board fills the viewport with HUD-friendly
+    // margins instead of staying at a fixed 28px on a desktop monitor.
+    const HUD_TOP = 56;
+    const HUD_BOTTOM = 32;
+    const fitW = Math.floor((w - 32) / cols);
+    const fitH = Math.floor((h - HUD_TOP - HUD_BOTTOM) / rows);
+    const target = Math.max(BLOCK_SIZE_LOGICAL, Math.min(72, Math.min(fitW, fitH)));
+    this.cellSize = target;
+
+    const boardW = cols * this.cellSize;
+    const boardH = rows * this.cellSize;
     this.boardOrigin = {
       x: Math.floor((w - boardW) / 2),
-      y: Math.floor((h - boardH) / 2) + 20,
+      y: Math.max(HUD_TOP, Math.floor((h - boardH) / 2)),
     };
   }
 

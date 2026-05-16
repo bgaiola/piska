@@ -30,7 +30,10 @@ import { ChainPopup } from '@/ui/ChainPopup';
 import { spawnClearBurst } from '@/engine/ParticleFX';
 import { haptic, HAPTIC } from '@/utils/haptics';
 
-const VS_CELL_SIZE = 22;
+const VS_CELL_SIZE_MIN = 22;
+const VS_CELL_SIZE_MAX = 56;
+const HUD_RESERVE_TOP = 56;
+const HUD_RESERVE_BOTTOM = 32;
 const GARBAGE_FILL = 0x666666;
 const GARBAGE_OUTLINE = 0x222222;
 const GARBAGE_UNLOCK_FILL = 0xa08070;
@@ -72,7 +75,7 @@ export class VsLocalScene extends Phaser.Scene {
   private p1Engine!: GameEngine;
   private p2Engine!: GameEngine;
 
-  private readonly cellSize = VS_CELL_SIZE;
+  private cellSize = VS_CELL_SIZE_MIN;
   private p1Origin = { x: 0, y: 0 };
   private p2Origin = { x: 0, y: 0 };
 
@@ -116,7 +119,8 @@ export class VsLocalScene extends Phaser.Scene {
 
     BGMPlayer.get().play('world-5');
 
-    this.cameras.main.setBackgroundColor('#160a1f');
+    this.cameras.main.setBackgroundColor('#08030f');
+    this.drawBackdrop();
 
     this.computeLayout();
 
@@ -162,14 +166,22 @@ export class VsLocalScene extends Phaser.Scene {
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
     const portrait = w < h;
-    const boardW = this.p1Engine.cfg.cols * this.cellSize;
-    const boardH = this.p1Engine.cfg.rows * this.cellSize;
+    const cols = this.p1Engine.cfg.cols;
+    const rows = this.p1Engine.cfg.rows;
     const gap = portrait ? 16 : 80;
+    const availableW = w - 16 * 2 - gap;
+    const availableH = h - HUD_RESERVE_TOP - HUD_RESERVE_BOTTOM;
+    const fitByWidth = Math.floor(availableW / (cols * 2));
+    const fitByHeight = Math.floor(availableH / rows);
+    this.cellSize = Math.max(
+      VS_CELL_SIZE_MIN,
+      Math.min(VS_CELL_SIZE_MAX, Math.min(fitByWidth, fitByHeight)),
+    );
+    const boardW = cols * this.cellSize;
+    const boardH = rows * this.cellSize;
     const totalW = boardW * 2 + gap;
     const baseX = Math.floor((w - totalW) / 2);
-    const baseY = portrait
-      ? Math.max(60, Math.floor((h - boardH) / 2))
-      : Math.max(40, Math.floor((h - boardH) / 2));
+    const baseY = Math.max(HUD_RESERVE_TOP, Math.floor((h - boardH) / 2));
     this.p1Origin = { x: baseX, y: baseY };
     this.p2Origin = { x: baseX + boardW + gap, y: baseY };
   }
@@ -252,6 +264,27 @@ export class VsLocalScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
   // Frame & rendering
   // ---------------------------------------------------------------------------
+
+  private drawBackdrop(): void {
+    const w = this.scale.gameSize.width;
+    const h = this.scale.gameSize.height;
+    const g = this.add.graphics();
+    // Same vertical gradient palette as VsScene so the duel scenes feel
+    // visually consistent across AI / local / online modes.
+    const stops = [
+      0x150624, 0x1b0a2c, 0x210c35, 0x270e3d, 0x2c1041, 0x2e1141,
+      0x331243, 0x3a1545, 0x401545, 0x441444, 0x441241, 0x3a0f38,
+    ];
+    const stripeH = Math.ceil(h / stops.length);
+    for (let i = 0; i < stops.length; i++) {
+      g.fillStyle(stops[i], 1);
+      g.fillRect(0, i * stripeH, w, stripeH + 1);
+    }
+    g.fillStyle(0x000000, 0.35);
+    g.fillRect(0, 0, w, 24);
+    g.fillRect(0, h - 24, w, 24);
+    g.setDepth(-1000);
+  }
 
   private drawFrames(): void {
     if (!this.framesGfx) return;

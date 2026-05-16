@@ -1,13 +1,18 @@
 /**
  * DialogBox — reusable dialog widget for adventure intro/outro scenes.
  *
- * Renders a rounded panel with a name plate and a typewriter text area. Each
- * call to `show()` returns a Promise that resolves when the player advances
- * the line (tap / space / enter). A tap mid-typeout completes the line
- * instantly without advancing — a second tap then advances.
+ * Renders a "framed manuscript" panel with a name plate and a typewriter text
+ * area. Each call to `show()` returns a Promise that resolves when the player
+ * advances the line (tap / space / enter). A tap mid-typeout completes the
+ * line instantly without advancing — a second tap then advances.
  *
  * The widget owns a Phaser.Container plus an internal keyboard / pointer
  * subscription that lives only between `show()` and its resolution.
+ *
+ * Visual recipe: outer 2px warm-amber stroke (0xffcc55) + inner 2px stroke
+ * inset 2px in a darker shade (0x6a4a18), filled with a dark purple-tinted
+ * background (0x1a0a22) at 90% alpha. A pulsing ▼ "next" indicator at the
+ * bottom-right hints more lines are available.
  */
 
 import Phaser from 'phaser';
@@ -21,11 +26,24 @@ export interface DialogBoxOptions {
   height: number;
 }
 
+// Framed-manuscript palette. Local constants — kept here so this widget owns
+// its full look without depending on a global theme module.
+const BORDER_OUTER = 0xffcc55;
+const BORDER_INNER = 0x6a4a18;
+const PANEL_FILL = 0x1a0a22;
+const PANEL_ALPHA = 0.9;
+const NAMEPLATE_FILL = 0x36204c;
+const NAMEPLATE_STROKE = 0xffcc55;
+const BODY_COLOR = '#fff';
+const NAME_COLOR = '#ffe';
+const HINT_COLOR = '#ffcc55';
+
 export class DialogBox {
   private readonly scene: Phaser.Scene;
   private readonly container: Phaser.GameObjects.Container;
+  private readonly outerBorder: Phaser.GameObjects.Rectangle;
+  private readonly innerBorder: Phaser.GameObjects.Rectangle;
   private readonly panel: Phaser.GameObjects.Rectangle;
-  private readonly border: Phaser.GameObjects.Rectangle;
   private readonly namePlate: Phaser.GameObjects.Rectangle;
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly bodyText: Phaser.GameObjects.Text;
@@ -40,6 +58,7 @@ export class DialogBox {
   private isTyping = false;
   private pendingResolve: (() => void) | null = null;
   private offFns: Array<() => void> = [];
+  private hintPulseTween: Phaser.Tweens.Tween | null = null;
 
   constructor(opts: DialogBoxOptions) {
     this.scene = opts.scene;
@@ -49,27 +68,33 @@ export class DialogBox {
     const container = this.scene.add.container(opts.x, opts.y);
     this.container = container;
 
-    this.border = this.scene.add
-      .rectangle(0, 0, this.width + 4, this.height + 4, 0x1a0f1f)
-      .setStrokeStyle(2, 0xffe6a0);
+    // Layered borders for the "framed manuscript" look: outer warm-amber
+    // stroke, then a darker inner stroke 2px in from the outer.
+    this.outerBorder = this.scene.add
+      .rectangle(0, 0, this.width + 4, this.height + 4, PANEL_FILL, PANEL_ALPHA)
+      .setStrokeStyle(2, BORDER_OUTER);
+    this.innerBorder = this.scene.add
+      .rectangle(0, 0, this.width, this.height, PANEL_FILL, 0)
+      .setStrokeStyle(2, BORDER_INNER);
     this.panel = this.scene.add
-      .rectangle(0, 0, this.width, this.height, 0x251338, 0.96)
-      .setStrokeStyle(1, 0x5a3a72);
-    container.add([this.border, this.panel]);
+      .rectangle(0, 0, this.width - 4, this.height - 4, PANEL_FILL, PANEL_ALPHA)
+      .setStrokeStyle(1, 0x3a204a);
+    container.add([this.outerBorder, this.innerBorder, this.panel]);
 
     // Name plate sits across the top-left corner.
-    const plateW = Math.min(140, Math.floor(this.width * 0.45));
+    const plateW = Math.min(160, Math.floor(this.width * 0.5));
     const plateH = 22;
-    const plateX = -Math.floor(this.width / 2) + Math.floor(plateW / 2) + 8;
+    const plateX = -Math.floor(this.width / 2) + Math.floor(plateW / 2) + 10;
     const plateY = -Math.floor(this.height / 2) - 2;
     this.namePlate = this.scene.add
-      .rectangle(plateX, plateY, plateW, plateH, 0x36204c)
-      .setStrokeStyle(1, 0xffe6a0);
+      .rectangle(plateX, plateY, plateW, plateH, NAMEPLATE_FILL, 0.95)
+      .setStrokeStyle(2, NAMEPLATE_STROKE);
     this.nameText = this.scene.add
       .text(plateX, plateY, '', {
         fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#ffe',
+        fontSize: '12px',
+        color: NAME_COLOR,
+        fontStyle: 'bold',
       })
       .setOrigin(0.5);
     container.add([this.namePlate, this.nameText]);
@@ -77,32 +102,35 @@ export class DialogBox {
     // Body text. Word-wrap to the panel's interior.
     this.bodyText = this.scene.add
       .text(
-        -Math.floor(this.width / 2) + 14,
-        -Math.floor(this.height / 2) + 24,
+        -Math.floor(this.width / 2) + 16,
+        -Math.floor(this.height / 2) + 26,
         '',
         {
           fontFamily: 'monospace',
           fontSize: '12px',
-          color: '#fff',
-          wordWrap: { width: this.width - 28 },
+          color: BODY_COLOR,
+          wordWrap: { width: this.width - 32 },
           lineSpacing: 4,
         },
       )
       .setOrigin(0, 0);
     container.add(this.bodyText);
 
+    // Pulsing "next" indicator at the bottom-right. ▼ char is more readable
+    // than ▶ for "advance" while sitting under the last visible line.
     this.hintText = this.scene.add
       .text(
-        Math.floor(this.width / 2) - 8,
+        Math.floor(this.width / 2) - 10,
         Math.floor(this.height / 2) - 10,
-        '▶',
+        '▼',
         {
           fontFamily: 'monospace',
-          fontSize: '10px',
-          color: '#ffe6a0',
+          fontSize: '12px',
+          color: HINT_COLOR,
+          fontStyle: 'bold',
         },
       )
-      .setOrigin(1, 0.5)
+      .setOrigin(1, 1)
       .setAlpha(0);
     container.add(this.hintText);
   }
@@ -165,12 +193,15 @@ export class DialogBox {
       this.typeTimer = null;
     }
     this.hintText.setAlpha(1);
-    this.scene.tweens.add({
+    // Looping alpha pulse for the ▼ indicator.
+    this.hintPulseTween?.stop();
+    this.hintPulseTween = this.scene.tweens.add({
       targets: this.hintText,
       alpha: { from: 0.4, to: 1 },
-      duration: 360,
+      duration: 480,
       yoyo: true,
       repeat: -1,
+      ease: 'Sine.easeInOut',
     });
   }
 
@@ -212,6 +243,8 @@ export class DialogBox {
       this.typeTimer.remove(false);
       this.typeTimer = null;
     }
+    this.hintPulseTween?.stop();
+    this.hintPulseTween = null;
     this.scene.tweens.killTweensOf(this.hintText);
     this.hintText.setAlpha(0);
     this.isTyping = false;
