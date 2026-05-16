@@ -7,6 +7,14 @@
  *
  * Both flows offer "Jogar de novo" and "Voltar ao menu". Replay re-launches
  * the appropriate scene (VsScene for AI, VsLocalScene for local).
+ *
+ * Cinematic treatment (fase 4 "FODA" polish):
+ *   - 12-stripe vertical gradient backdrop matching VsScene's "Forja
+ *     Vulcânica" palette so the result reads as the same arena.
+ *   - Score numbers tween from 0 → final over ~700ms with Cubic.easeOut.
+ *   - A glowing crown (★) sits next to the winner's score and pulses
+ *     gently so the eye is drawn there first.
+ *   - "Jogar de novo" is rendered larger / more prominent than "Voltar".
  */
 
 import Phaser from 'phaser';
@@ -37,11 +45,15 @@ const FOCUS_COLOR = 0xffeecc;
 const UNFOCUS_COLOR = 0x777777;
 const FOCUS_TEXT = '#ffe';
 const UNFOCUS_TEXT = '#ccc';
+const FOCUS_FILL = 0x36204c;
+const UNFOCUS_FILL = 0x251338;
 
 interface ActionCard {
   key: 'replay' | 'back';
   label: string;
   container: Phaser.GameObjects.Container;
+  // Replay is rendered larger so it stands out as the dominant call-to-action.
+  prominent: boolean;
 }
 
 interface ResolvedResult {
@@ -51,9 +63,18 @@ interface ResolvedResult {
   rightLabel: string;
   leftScore: number;
   rightScore: number;
+  // True when the winner sits on the right-hand column.
+  winnerOnRight: boolean;
   headlineText: string;
   headlineColor: string;
   difficulty: AIDifficulty;
+}
+
+interface ScoreTracker {
+  value: number;
+  target: number;
+  text: Phaser.GameObjects.Text;
+  tween: Phaser.Tweens.Tween | null;
 }
 
 export class VsResultScene extends Phaser.Scene {
@@ -61,6 +82,7 @@ export class VsResultScene extends Phaser.Scene {
   private cursor = 0;
   private actions: ActionCard[] = [];
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private scoreTrackers: ScoreTracker[] = [];
 
   constructor() {
     super('VsResultScene');
@@ -70,6 +92,7 @@ export class VsResultScene extends Phaser.Scene {
     this.result = this.normalize(data);
     this.cursor = 0;
     this.actions = [];
+    this.scoreTrackers = [];
   }
 
   private normalize(data: VsResultData): ResolvedResult {
@@ -91,6 +114,7 @@ export class VsResultScene extends Phaser.Scene {
         rightLabel: t('vs.p2'),
         leftScore: p1Score,
         rightScore: p2Score,
+        winnerOnRight: winnerKey === 'p2',
         headlineText: winnerKey === 'p1' ? t('vs.p1.won') : t('vs.p2.won'),
         headlineColor: winnerKey === 'p1' ? '#aef58a' : '#a8caff',
         difficulty: data.difficulty ?? 'medium',
@@ -105,6 +129,7 @@ export class VsResultScene extends Phaser.Scene {
       rightLabel: t('vs.ai'),
       leftScore: data.playerScore ?? 0,
       rightScore: data.aiScore ?? 0,
+      winnerOnRight: winnerKey === 'ai',
       headlineText: winnerKey === 'player' ? t('vs.you.won') : t('vs.ai.won'),
       headlineColor: winnerKey === 'player' ? '#aef58a' : '#f88a8a',
       difficulty: data.difficulty ?? 'medium',
@@ -117,11 +142,12 @@ export class VsResultScene extends Phaser.Scene {
 
     // Opaque backdrop so the paused Vs scene (boards, HUD, chain popups,
     // garbage queue) doesn't bleed through and visually compete with the
-    // result panel.
+    // result panel, then layer the gradient stripes on top.
     this.add.rectangle(0, 0, w, h, 0x14081c, 1).setOrigin(0, 0);
+    this.drawGradient(w, h);
 
     this.add
-      .text(w / 2, h * 0.22, this.result.headlineText, {
+      .text(w / 2, h * 0.18, this.result.headlineText, {
         fontFamily: 'monospace',
         fontSize: '28px',
         color: this.result.headlineColor,
@@ -132,7 +158,7 @@ export class VsResultScene extends Phaser.Scene {
       this.add
         .text(
           w / 2,
-          h * 0.32,
+          h * 0.28,
           t('vs.difficulty', { difficulty: difficultyLabel(this.result.difficulty) }),
           {
             fontFamily: 'monospace',
@@ -143,7 +169,7 @@ export class VsResultScene extends Phaser.Scene {
         .setOrigin(0.5);
     } else {
       this.add
-        .text(w / 2, h * 0.32, t('vs.local.subtitle'), {
+        .text(w / 2, h * 0.28, t('vs.local.subtitle'), {
           fontFamily: 'monospace',
           fontSize: '12px',
           color: '#bbf',
@@ -154,39 +180,53 @@ export class VsResultScene extends Phaser.Scene {
     // Scoreboard: two columns flanking the vertical centerline so the panel
     // reads as a head-to-head card on both narrow phones and wide desktop.
     const colOffset = 90;
-    const scoreLabelY = h * 0.44;
+    const leftX = w / 2 - colOffset;
+    const rightX = w / 2 + colOffset;
+    const scoreLabelY = h * 0.42;
     const scoreValueY = h * 0.5;
+
     this.add
-      .text(w / 2 - colOffset, scoreLabelY, this.result.leftLabel, {
+      .text(leftX, scoreLabelY, this.result.leftLabel, {
         fontFamily: 'monospace',
         fontSize: '12px',
         color: '#bbb',
       })
       .setOrigin(0.5);
-    this.add
-      .text(w / 2 - colOffset, scoreValueY, `${this.result.leftScore}`, {
+    const leftScoreText = this.add
+      .text(leftX, scoreValueY, '0', {
         fontFamily: 'monospace',
-        fontSize: '22px',
-        color: FOCUS_TEXT,
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(w / 2 + colOffset, scoreLabelY, this.result.rightLabel, {
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#bbb',
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(w / 2 + colOffset, scoreValueY, `${this.result.rightScore}`, {
-        fontFamily: 'monospace',
-        fontSize: '22px',
-        color: UNFOCUS_TEXT,
+        fontSize: '26px',
+        color: this.result.winnerOnRight ? UNFOCUS_TEXT : FOCUS_TEXT,
       })
       .setOrigin(0.5);
 
-    this.buildAction(w / 2, h * 0.68, 'replay', t('vs.replay'));
-    this.buildAction(w / 2, h * 0.78, 'back', t('vs.back'));
+    this.add
+      .text(rightX, scoreLabelY, this.result.rightLabel, {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#bbb',
+      })
+      .setOrigin(0.5);
+    const rightScoreText = this.add
+      .text(rightX, scoreValueY, '0', {
+        fontFamily: 'monospace',
+        fontSize: '26px',
+        color: this.result.winnerOnRight ? FOCUS_TEXT : UNFOCUS_TEXT,
+      })
+      .setOrigin(0.5);
+
+    this.animateScore(leftScoreText, this.result.leftScore);
+    this.animateScore(rightScoreText, this.result.rightScore);
+
+    // Crown / glow next to the winner's score column. Positioned to the
+    // outside of the column so it doesn't crowd the number.
+    const crownOffset = 56;
+    const crownX = this.result.winnerOnRight ? rightX + crownOffset : leftX - crownOffset;
+    this.drawWinnerCrown(crownX, scoreValueY);
+
+    // Action buttons — replay is the primary CTA so it gets the larger box.
+    this.buildAction(w / 2, h * 0.7, 'replay', t('vs.replay'), true);
+    this.buildAction(w / 2, h * 0.81, 'back', t('vs.back'), false);
 
     this.add
       .text(w / 2, h - 18, t('vs.hint'), {
@@ -203,30 +243,119 @@ export class VsResultScene extends Phaser.Scene {
     this.events.on('destroy', () => this.cleanup());
   }
 
+  // ---------------------------------------------------------------------------
+  // Backdrop
+  // ---------------------------------------------------------------------------
+
+  private drawGradient(w: number, h: number): void {
+    // Same 12 stops as VsScene.drawBackdrop() — deep purple → ember base.
+    const stops = [
+      0x150624, 0x1b0a2c, 0x210c35, 0x270e3d, 0x2c1041, 0x2e1141,
+      0x331243, 0x3a1545, 0x401545, 0x441444, 0x441241, 0x3a0f38,
+    ];
+    const g = this.add.graphics();
+    const stripeH = Math.ceil(h / stops.length);
+    for (let i = 0; i < stops.length; i++) {
+      g.fillStyle(stops[i], 1);
+      g.fillRect(0, i * stripeH, w, stripeH + 1);
+    }
+    // Top/bottom vignette: matches the VsScene treatment.
+    g.fillStyle(0x000000, 0.35);
+    g.fillRect(0, 0, w, 24);
+    g.fillRect(0, h - 24, w, 24);
+    g.setDepth(-1000);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Score animation + crown
+  // ---------------------------------------------------------------------------
+
+  private animateScore(text: Phaser.GameObjects.Text, target: number): void {
+    if (target <= 0) {
+      text.setText('0');
+      return;
+    }
+    const tracker: ScoreTracker = { value: 0, target, text, tween: null };
+    tracker.tween = this.tweens.add({
+      targets: tracker,
+      value: target,
+      duration: 600,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => {
+        text.setText(String(Math.floor(tracker.value)));
+      },
+      onComplete: () => {
+        text.setText(String(target));
+      },
+    });
+    this.scoreTrackers.push(tracker);
+  }
+
+  private drawWinnerCrown(cx: number, cy: number): void {
+    // The '★' character is far more reliable across monospace fallbacks
+    // than '👑' (emoji widths vary wildly between fonts).
+    const crown = this.add
+      .text(cx, cy, '★', {
+        fontFamily: 'monospace',
+        fontSize: '26px',
+        color: '#ffe35a',
+        stroke: '#3a1a02',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5);
+    crown.setAlpha(0).setScale(0.4);
+    this.tweens.add({
+      targets: crown,
+      alpha: 1,
+      scale: 1,
+      duration: 320,
+      delay: 500,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: crown,
+          scale: 1.15,
+          alpha: 0.85,
+          duration: 800,
+          ease: 'Sine.easeInOut',
+          yoyo: true,
+          repeat: -1,
+        });
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Action buttons
+  // ---------------------------------------------------------------------------
+
   private buildAction(
     cx: number,
     cy: number,
     key: 'replay' | 'back',
     label: string,
+    prominent: boolean,
   ): void {
     const idx = this.actions.length;
     const container = this.add.container(cx, cy);
+    const width = prominent ? 240 : 200;
+    const height = prominent ? 44 : 36;
     const bg = this.add
-      .rectangle(0, 0, 200, 36, 0x251338, 0.95)
+      .rectangle(0, 0, width, height, UNFOCUS_FILL, 0.95)
       .setStrokeStyle(2, UNFOCUS_COLOR, 1);
     bg.setName('bg');
 
     const text = this.add
       .text(0, 0, label, {
         fontFamily: 'monospace',
-        fontSize: '12px',
+        fontSize: prominent ? '14px' : '12px',
         color: UNFOCUS_TEXT,
       })
       .setOrigin(0.5);
     text.setName('label');
 
     container.add([bg, text]);
-    container.setSize(200, 36);
+    container.setSize(width, height);
 
     bg.setInteractive({ useHandCursor: true });
     bg.on('pointerover', () => {
@@ -239,7 +368,7 @@ export class VsResultScene extends Phaser.Scene {
       this.confirm();
     });
 
-    this.actions.push({ key, label, container });
+    this.actions.push({ key, label, container, prominent });
   }
 
   private refreshFocus(): void {
@@ -249,7 +378,7 @@ export class VsResultScene extends Phaser.Scene {
       const label = a.container.getByName('label') as Phaser.GameObjects.Text | null;
       if (bg !== null) {
         bg.setStrokeStyle(2, focused ? FOCUS_COLOR : UNFOCUS_COLOR, 1);
-        bg.setFillStyle(focused ? 0x36204c : 0x251338, 0.95);
+        bg.setFillStyle(focused ? FOCUS_FILL : UNFOCUS_FILL, 0.95);
       }
       if (label !== null) {
         label.setColor(focused ? FOCUS_TEXT : UNFOCUS_TEXT);
@@ -334,5 +463,9 @@ export class VsResultScene extends Phaser.Scene {
       window.removeEventListener('keydown', this.keyHandler);
       this.keyHandler = null;
     }
+    for (const tr of this.scoreTrackers) {
+      tr.tween?.stop();
+    }
+    this.scoreTrackers = [];
   }
 }
