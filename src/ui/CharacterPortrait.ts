@@ -194,16 +194,19 @@ export class CharacterPortrait {
 
     switch (this.characterId) {
       case 'pim': {
-        // Two pointed fox ears on top, accent-coloured inner triangles.
-        const earY = -half + 2;
-        const earSpan = s * 0.18;
-        const earH = s * 0.28;
+        // Two pointed fox ears that protrude ABOVE the box, with darker
+        // accent inner triangle.
+        const earBaseY = -half + 4;
+        const earTipY = -half - s * 0.28;
+        const earSpan = s * 0.26;
+        const earHalfW = s * 0.1;
         g.fillStyle(primary, 1);
-        g.fillTriangle(-earSpan - 8, earY + earH, -earSpan + 8, earY + earH, -earSpan, earY);
-        g.fillTriangle(earSpan - 8, earY + earH, earSpan + 8, earY + earH, earSpan, earY);
+        g.fillTriangle(-earSpan - earHalfW, earBaseY, -earSpan + earHalfW, earBaseY, -earSpan, earTipY);
+        g.fillTriangle(earSpan - earHalfW, earBaseY, earSpan + earHalfW, earBaseY, earSpan, earTipY);
+        // Inner accent (darker green so the ear reads even on the green body).
         g.fillStyle(accent, 1);
-        g.fillTriangle(-earSpan - 4, earY + earH - 2, -earSpan + 4, earY + earH - 2, -earSpan, earY + 6);
-        g.fillTriangle(earSpan - 4, earY + earH - 2, earSpan + 4, earY + earH - 2, earSpan, earY + 6);
+        g.fillTriangle(-earSpan - earHalfW * 0.6, earBaseY, -earSpan + earHalfW * 0.6, earBaseY, -earSpan, earTipY + 6);
+        g.fillTriangle(earSpan - earHalfW * 0.6, earBaseY, earSpan + earHalfW * 0.6, earBaseY, earSpan, earTipY + 6);
         // Snout patch under the mouth.
         g.fillStyle(0xfff0e2, 1);
         g.fillRoundedRect(-s * 0.18, s * 0.1, s * 0.36, s * 0.22, 4);
@@ -239,15 +242,20 @@ export class CharacterPortrait {
         break;
       }
       case 'murena': {
-        // Five tentacles dangling below the head area.
+        // Five tentacles dangling BELOW the box.
         g.fillStyle(primary, 1);
-        const baseY = s * 0.28;
-        const tx = [-s * 0.32, -s * 0.16, 0, s * 0.16, s * 0.32];
+        const baseY = half;
+        const tx = [-s * 0.34, -s * 0.17, 0, s * 0.17, s * 0.34];
         for (const x of tx) {
-          g.fillRoundedRect(x - 4, baseY, 8, s * 0.22, { tl: 0, tr: 0, bl: 4, br: 4 });
+          g.fillRoundedRect(x - 4, baseY, 8, s * 0.28, { tl: 0, tr: 0, bl: 4, br: 4 });
         }
-        // Round glasses on top of the eyes layer (drawn here as colored rings;
-        // the eye dots in drawFace render inside them).
+        // Tentacle suckers (small accent dots) to read as octopus.
+        g.fillStyle(accent, 1);
+        for (const x of tx) {
+          g.fillCircle(x, baseY + s * 0.08, 2);
+          g.fillCircle(x, baseY + s * 0.2, 2);
+        }
+        // Round glasses framing the eyes.
         g.lineStyle(2, ink, 1);
         const eyeY = -s * 0.08;
         g.strokeCircle(-s * 0.18, eyeY, 9);

@@ -28,7 +28,10 @@ import { haptic, HAPTIC } from '@/utils/haptics';
 import { CHARACTERS, type CharacterDef } from '@/data/characters';
 import { CharacterPortrait } from '@/ui/CharacterPortrait';
 
-const VS_CELL_SIZE = 22;
+const VS_CELL_SIZE_MIN = 22;
+const VS_CELL_SIZE_MAX = 56;
+const HUD_RESERVE_TOP = 64;
+const HUD_RESERVE_BOTTOM = 32;
 const GARBAGE_FILL = 0x666666;
 const GARBAGE_OUTLINE = 0x222222;
 const GARBAGE_UNLOCK_FILL = 0xa08070;
@@ -49,7 +52,7 @@ export class VsScene extends Phaser.Scene {
   private ai!: AIPlayer;
   private difficulty: AIDifficulty = 'medium';
 
-  private readonly cellSize = VS_CELL_SIZE;
+  private cellSize = VS_CELL_SIZE_MIN;
   private playerOrigin = { x: 0, y: 0 };
   private aiOrigin = { x: 0, y: 0 };
 
@@ -112,7 +115,8 @@ export class VsScene extends Phaser.Scene {
 
     BGMPlayer.get().play('world-5');
 
-    this.cameras.main.setBackgroundColor('#160a1f');
+    this.cameras.main.setBackgroundColor('#08030f');
+    this.drawBackdrop();
 
     this.computeLayout();
 
@@ -170,14 +174,28 @@ export class VsScene extends Phaser.Scene {
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
     const portrait = w < h;
-    const boardW = this.playerCols() * this.cellSize;
-    const boardH = this.playerRows() * this.cellSize;
+    const cols = this.playerCols();
+    const rows = this.playerRows();
+
+    // Pick the largest integer cell size that still fits both boards side by
+    // side with HUD-friendly margins. Without this the cells stay at 22px and
+    // look tiny on desktop monitors.
     const gap = portrait ? 16 : 80;
+    const availableW = w - 16 * 2 - gap; // gutter on each side + middle gap
+    const availableH = h - HUD_RESERVE_TOP - HUD_RESERVE_BOTTOM;
+    const fitByWidth = Math.floor(availableW / (cols * 2));
+    const fitByHeight = Math.floor(availableH / rows);
+    const cellSize = Math.max(
+      VS_CELL_SIZE_MIN,
+      Math.min(VS_CELL_SIZE_MAX, Math.min(fitByWidth, fitByHeight)),
+    );
+    this.cellSize = cellSize;
+
+    const boardW = cols * cellSize;
+    const boardH = rows * cellSize;
     const totalW = boardW * 2 + gap;
     const baseX = Math.floor((w - totalW) / 2);
-    const baseY = portrait
-      ? Math.max(60, Math.floor((h - boardH) / 2))
-      : Math.max(40, Math.floor((h - boardH) / 2));
+    const baseY = Math.max(HUD_RESERVE_TOP, Math.floor((h - boardH) / 2));
     this.playerOrigin = { x: baseX, y: baseY };
     this.aiOrigin = { x: baseX + boardW + gap, y: baseY };
   }
@@ -194,8 +212,13 @@ export class VsScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   private drawHudLabels(): void {
-    const labelY = Math.max(8, this.playerOrigin.y - 36);
-    const subY = Math.max(22, this.playerOrigin.y - 22);
+    // Three stacked rows above each board: name (top), sub/species (middle,
+    // adventure only), score (bottom). Spacing scaled so the rows never
+    // overlap even with the adventure sub-label present.
+    const hasSub = this.adventureCharacter !== undefined;
+    const nameY = Math.max(12, this.playerOrigin.y - (hasSub ? 50 : 32));
+    const subY = nameY + 14;
+    const scoreY = hasSub ? nameY + 28 : nameY + 16;
 
     const playerCenterX =
       this.playerOrigin.x + (this.playerCols() * this.cellSize) / 2;
@@ -203,10 +226,11 @@ export class VsScene extends Phaser.Scene {
       this.aiOrigin.x + (this.playerCols() * this.cellSize) / 2;
 
     this.playerLabel = this.add
-      .text(playerCenterX, labelY, 'VOCÊ', {
+      .text(playerCenterX, nameY, 'VOCÊ', {
         fontFamily: 'monospace',
-        fontSize: '12px',
+        fontSize: '13px',
         color: HUD_LABEL_COLOR,
+        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
@@ -221,34 +245,38 @@ export class VsScene extends Phaser.Scene {
       : null;
 
     this.aiLabel = this.add
-      .text(aiCenterX, labelY, aiLabelText, {
+      .text(aiCenterX, nameY, aiLabelText, {
         fontFamily: 'monospace',
-        fontSize: '12px',
+        fontSize: '13px',
         color: HUD_LABEL_COLOR,
+        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
     if (aiSubText) {
       this.aiSubLabel = this.add
-        .text(aiCenterX, labelY + 12, aiSubText, {
+        .text(aiCenterX, subY, aiSubText, {
           fontFamily: 'monospace',
-          fontSize: '9px',
+          fontSize: '10px',
           color: HUD_SUB_COLOR,
         })
         .setOrigin(0.5);
     }
 
-    // Small character portrait tucked to the outer-left of the AI board
-    // (Adventure runs only). Positioned beside the board so it does not
-    // overlap with the playfield or the HUD labels above it.
+    // Character portrait sits to the OUTER edge of the AI board so it
+    // doesn't crowd the playfield or the labels stacked on top.
     if (charDef) {
-      const portraitSize = 48;
-      const portraitX = Math.max(
-        portraitSize / 2 + 4,
-        this.aiOrigin.x - portraitSize / 2 - 8,
+      const portraitSize = 64;
+      const aiBoardRight =
+        this.aiOrigin.x + this.playerCols() * this.cellSize;
+      // Prefer placing it to the right of the AI board, fall back to the
+      // viewport edge clamp on narrow screens.
+      const portraitX = Math.min(
+        this.scale.gameSize.width - portraitSize / 2 - 8,
+        aiBoardRight + portraitSize / 2 + 12,
       );
       const portraitY =
-        this.aiOrigin.y + this.playerRows() * this.cellSize - portraitSize / 2;
+        this.aiOrigin.y + Math.floor(portraitSize / 2) + 4;
       this.aiPortrait = new CharacterPortrait({
         scene: this,
         x: portraitX,
@@ -260,17 +288,17 @@ export class VsScene extends Phaser.Scene {
     }
 
     this.playerScoreText = this.add
-      .text(playerCenterX, subY, '0', {
+      .text(playerCenterX, scoreY, '0', {
         fontFamily: 'monospace',
-        fontSize: '10px',
+        fontSize: '11px',
         color: HUD_SUB_COLOR,
       })
       .setOrigin(0.5);
 
     this.aiScoreText = this.add
-      .text(aiCenterX, subY, '0', {
+      .text(aiCenterX, scoreY, '0', {
         fontFamily: 'monospace',
-        fontSize: '10px',
+        fontSize: '11px',
         color: HUD_SUB_COLOR,
       })
       .setOrigin(0.5);
@@ -310,6 +338,29 @@ export class VsScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
   // Frame & rendering
   // ---------------------------------------------------------------------------
+
+  private drawBackdrop(): void {
+    const w = this.scale.gameSize.width;
+    const h = this.scale.gameSize.height;
+    const g = this.add.graphics();
+    // Vertical multi-stop gradient via 12 stripes from a deep purple top to
+    // an ember-tinged base (this is the Forja Vulcânica world). Cheap and
+    // gives the scene depth without sampling per-pixel.
+    const stops = [
+      0x150624, 0x1b0a2c, 0x210c35, 0x270e3d, 0x2c1041, 0x2e1141,
+      0x331243, 0x3a1545, 0x401545, 0x441444, 0x441241, 0x3a0f38,
+    ];
+    const stripeH = Math.ceil(h / stops.length);
+    for (let i = 0; i < stops.length; i++) {
+      g.fillStyle(stops[i], 1);
+      g.fillRect(0, i * stripeH, w, stripeH + 1);
+    }
+    // A subtle vignette: dark soft border that pulls the eye to the center.
+    g.fillStyle(0x000000, 0.35);
+    g.fillRect(0, 0, w, 24);
+    g.fillRect(0, h - 24, w, 24);
+    g.setDepth(-1000);
+  }
 
   private drawFrames(): void {
     if (!this.framesGfx) return;
