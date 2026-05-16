@@ -66,9 +66,11 @@ export class VirtualButtons {
     // discover the quit/settings flow without having to guess that "II"
     // also opens an exit menu.
     this.pauseBtn = this.makeButton('MENU', ['piska-vb', 'piska-vb-pause']);
-    this.pauseBtn.style.width = '64px';
-    this.pauseBtn.style.height = '40px';
-    this.pauseBtn.style.fontSize = '12px';
+    // 44px tap target (Apple HIG minimum) so the press registers reliably
+    // on touch — was 40px before and intermittently missed on iOS.
+    this.pauseBtn.style.width = '72px';
+    this.pauseBtn.style.height = '44px';
+    this.pauseBtn.style.fontSize = '13px';
     this.pauseBtn.style.fontWeight = 'bold';
     this.pauseBtn.style.letterSpacing = '1px';
 
@@ -307,16 +309,32 @@ export class VirtualButtons {
   }
 
   private bindPause(): void {
+    // Fire the action on pointerup (matching the JOGAR button pattern that
+    // proved reliable on iOS Safari). The previous pointerdown handler was
+    // intermittently failing on touch — possibly the synthesized click
+    // sequence racing the preventDefault. pointerup is what mobile players
+    // expect anyway ("button fires when finger lifts").
+    let pressed = false;
     this.pauseBtn.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
+      pressed = true;
       this.pauseBtn.classList.add('is-pressed');
-      this.emit('pause', {});
     });
-    const up = (): void => {
+    const release = (fireEmit: boolean): void => {
       this.pauseBtn.classList.remove('is-pressed');
+      if (fireEmit && pressed) {
+        this.emit('pause', {});
+      }
+      pressed = false;
     };
-    this.pauseBtn.addEventListener('pointerup', up);
-    this.pauseBtn.addEventListener('pointercancel', up);
-    this.pauseBtn.addEventListener('pointerleave', up);
+    this.pauseBtn.addEventListener('pointerup', () => release(true));
+    this.pauseBtn.addEventListener('pointercancel', () => release(false));
+    this.pauseBtn.addEventListener('pointerleave', () => release(false));
+    // Belt and suspenders for mouse-only browsers + iOS quirks where a
+    // synthesized 'click' may fire without a matching pointerup.
+    this.pauseBtn.addEventListener('click', () => {
+      if (!pressed) this.emit('pause', {});
+      pressed = false;
+    });
   }
 }

@@ -89,12 +89,12 @@ canvas {
 }
 
 .piska-vb-pause {
-  width: 64px;
-  height: 40px;
+  width: 72px;
+  height: 44px;
   right: calc(16px + var(--safe-right));
   top: calc(16px + var(--safe-top));
-  background: rgba(220, 80, 120, 0.45);
-  border-color: rgba(255, 220, 120, 0.7);
+  background: rgba(220, 80, 120, 0.55);
+  border-color: rgba(255, 220, 120, 0.8);
 }
 
 .piska-vb-dpad {
