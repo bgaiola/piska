@@ -34,6 +34,40 @@ import enDict from '@/i18n/en';
 import { SaveManager } from '@/save/SaveManager';
 import { BGMPlayer, SFXPlayer } from '@/audio';
 
+// On mobile we can't easily open DevTools, so surface any unhandled error
+// as a visible toast so the player (or me, debugging) sees what went wrong
+// instead of staring at a frozen canvas.
+function installErrorOverlay(): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const show = (message: string): void => {
+    let host = document.getElementById('piska-err');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'piska-err';
+      host.style.cssText =
+        'position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;' +
+        'background:#3a0a14;color:#ffe;border:2px solid #f88;padding:10px;' +
+        'font:12px/1.4 monospace;border-radius:6px;max-height:50vh;overflow:auto;' +
+        'box-shadow:0 4px 16px rgba(0,0,0,0.6);';
+      host.addEventListener('click', () => host?.remove());
+      document.body.appendChild(host);
+    }
+    const line = document.createElement('div');
+    line.textContent = message;
+    line.style.marginTop = '4px';
+    host.appendChild(line);
+  };
+  window.addEventListener('error', (ev) => {
+    show(`ERR ${ev.message} @ ${ev.filename?.split('/').pop()}:${ev.lineno}`);
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    const reason = ev.reason;
+    const text = reason instanceof Error ? reason.message : String(reason);
+    show(`REJ ${text}`);
+  });
+}
+installErrorOverlay();
+
 // Initialize i18n before any scene runs so first-frame labels render with
 // the player's chosen locale. Order: register all dictionaries → init (reads
 // localStorage / navigator) → if a SaveManager-stored locale exists, prefer
