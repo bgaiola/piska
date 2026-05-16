@@ -9,7 +9,7 @@
  * Bump VERSION to invalidate previous caches on the next activate.
  */
 
-const VERSION = 'piska-v16';
+const VERSION = 'piska-v17';
 const PRECACHE = ['/piska/'];
 
 self.addEventListener('install', (e) => {

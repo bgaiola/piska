@@ -30,12 +30,14 @@ export const DEBUG = false;
  * shapes rather than spritesheets, so we keep the palette purely in code.
  */
 export const BLOCK_COLOR_HEX: Record<BlockColor, number> = {
-  red: 0xe34b6e,
-  blue: 0x4b8de3,
-  green: 0x6ed058,
-  yellow: 0xf5d24a,
-  purple: 0xa05ad6,
-  cyan: 0x4ed8d8,
+  // Saturated 16-bit palette — more pop than the original mauve set so the
+  // blocks read clearly against the deep-purple play backdrops.
+  red: 0xff3a55,
+  blue: 0x3aa0ff,
+  green: 0x4ed83a,
+  yellow: 0xffd935,
+  purple: 0xc24cff,
+  cyan: 0x36ecd4,
 };
 
 /**

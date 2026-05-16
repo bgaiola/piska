@@ -106,7 +106,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   cols: 6,
   numColors: 5,
   initialStackHeight: 5,
-  baseRiseSpeed: 0.1,
+  baseRiseSpeed: 0.12,
   swapDurationMs: 80,
   clearDurationMs: 320,
   fallStepMs: 60,

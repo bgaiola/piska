@@ -41,6 +41,10 @@ export class GameEngine {
   // Public read-only access for HUD/telegraph to show a countdown bar.
   // Stays at 0 when no garbage is queued.
   dropDelayTimer: number = 0;
+  /** Total ms ticked since this engine was constructed. Drives the
+   *  Endless rise-speed ramp so survival becomes more demanding as the
+   *  player digs in. Public-readable for the HUD. */
+  elapsedMs: number = 0;
 
   constructor(cfg?: Partial<EngineConfig>) {
     this.cfg = { ...DEFAULT_CONFIG, ...(cfg ?? {}) };
@@ -162,6 +166,8 @@ export class GameEngine {
   tick(dtMs: number): void {
     if (this.paused || this.gameOver) return;
 
+    this.elapsedMs += dtMs;
+
     // 1. Advance swap timers.
     this.advanceSwapTimers(dtMs);
 
@@ -208,7 +214,12 @@ export class GameEngine {
     // 6. Rise tick. Rise pauses while any swap/clear is in progress, but does
     //    not pause for falling-only states (Panel de Pon classic).
     if (!this.anySwappingOrClearing()) {
-      const speed = this.cfg.baseRiseSpeed * (this.manualRaise ? 16 : 1);
+      // Time-based ramp: speed climbs ~15% every minute of play, capped at
+      // 3× the configured base. Puzzle / Stage Clear pass baseRiseSpeed=0
+      // so the ramp is a no-op for them.
+      const minutes = this.elapsedMs / 60_000;
+      const rampMultiplier = Math.min(3, 1 + minutes * 0.15);
+      const speed = this.cfg.baseRiseSpeed * rampMultiplier * (this.manualRaise ? 16 : 1);
       this.grid.riseOffset += (speed * dtMs) / 1000;
       // Clamp to [0, 1) by performing any whole-row rises that fit.
       let safety = 64;
