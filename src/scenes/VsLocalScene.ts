@@ -25,7 +25,8 @@ import Phaser from 'phaser';
 import { GameEngine } from '@/engine';
 import type { Block, BlockColor, EngineEvent } from '@/engine';
 import { BGMPlayer, SFXPlayer } from '@/audio';
-import { BLOCK_COLOR_HEX, BLOCK_SYMBOL, darken } from '@/config';
+import { BLOCK_COLOR_HEX, BLOCK_SYMBOL } from '@/config';
+import { drawBeveledBlock, drawFlashBlock } from '@/ui/drawBeveledBlock';
 import { ChainPopup } from '@/ui/ChainPopup';
 import { spawnClearBurst } from '@/engine/ParticleFX';
 import { haptic, HAPTIC } from '@/utils/haptics';
@@ -431,26 +432,31 @@ export class VsLocalScene extends Phaser.Scene {
       return;
     }
 
-    const fillColor = flashWhite
-      ? 0xffffff
-      : BLOCK_COLOR_HEX[block.color as BlockColor];
-    const outlineColor = darken(BLOCK_COLOR_HEX[block.color as BlockColor], 0.5);
+    const blockColor = BLOCK_COLOR_HEX[block.color as BlockColor];
+    const blockObj = flashWhite
+      ? drawFlashBlock({ scene: this, parent: container, x: cx, y: cy, size: cellSize })
+      : drawBeveledBlock({
+          scene: this,
+          parent: container,
+          x: cx,
+          y: cy,
+          size: cellSize,
+          color: blockColor,
+        });
+    blockObj.setAlpha(alpha);
+    blockObj.setScale(scale);
 
-    const rect = this.add.rectangle(cx, cy, cellSize - 2, cellSize - 2, fillColor, alpha);
-    rect.setStrokeStyle(1, outlineColor, alpha);
-    rect.setScale(scale);
-
+    const symbolPx = Math.max(8, Math.floor(cellSize * 0.42));
     const label = this.add
       .text(cx, cy, BLOCK_SYMBOL[block.color as BlockColor], {
         fontFamily: 'monospace',
-        fontSize: '10px',
+        fontSize: `${symbolPx}px`,
         color: this.symbolColorFor(block.color),
       })
       .setOrigin(0.5)
-      .setAlpha(alpha)
+      .setAlpha(alpha * 0.92)
       .setScale(scale);
 
-    container.add(rect);
     container.add(label);
   }
 
@@ -605,7 +611,7 @@ export class VsLocalScene extends Phaser.Scene {
       if (!block || block.kind === 'garbage') continue;
       const cx = originX + (c.col + 0.5) * cellSize;
       const cy = originY + (c.row + 0.5) * cellSize - riseShift;
-      spawnClearBurst(this, cx, cy, BLOCK_COLOR_HEX[block.color]);
+      spawnClearBurst(this, cx, cy, BLOCK_COLOR_HEX[block.color], this.cellSize);
     }
 
     if (e.chain >= 3 || e.comboSize >= 5) {

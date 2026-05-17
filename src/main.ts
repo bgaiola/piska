@@ -28,12 +28,14 @@ import { AdventureMapScene } from '@/scenes/AdventureMapScene';
 import { AdventureStageSelectScene } from '@/scenes/AdventureStageSelectScene';
 import { StageIntroScene } from '@/scenes/StageIntroScene';
 import { StageOutroScene } from '@/scenes/StageOutroScene';
+import { AboutScene } from '@/scenes/AboutScene';
 import { i18n } from '@/i18n';
 import ptBR from '@/i18n/pt-BR';
 import esES from '@/i18n/es-ES';
 import enDict from '@/i18n/en';
 import { SaveManager } from '@/save/SaveManager';
 import { BGMPlayer, SFXPlayer } from '@/audio';
+import { mountMuteButton } from '@/ui/MuteButton';
 
 // On mobile we can't easily open DevTools, so surface any unhandled error
 // as a visible toast so the player (or me, debugging) sees what went wrong
@@ -123,6 +125,7 @@ const game = new Phaser.Game({
     AdventureStageSelectScene,
     StageIntroScene,
     StageOutroScene,
+    AboutScene,
   ],
 });
 
@@ -158,6 +161,11 @@ function handleViewportChange(): void {
 
 window.addEventListener('resize', handleViewportChange);
 window.addEventListener('orientationchange', handleViewportChange);
+
+// Mount the persistent mute button overlay AFTER the Phaser game has been
+// created so the canvas is in the DOM and we can layer the button on top.
+const muteRoot = document.getElementById('game-root') ?? document.body;
+mountMuteButton(muteRoot);
 
 if (import.meta.env?.DEV) {
   (window as unknown as { __PISKA__: Phaser.Game }).__PISKA__ = game;

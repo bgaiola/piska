@@ -36,6 +36,7 @@ import Phaser from 'phaser';
 import type { ModeResultData } from '@/modes/ModeBase';
 import { SaveManager } from '@/save/SaveManager';
 import { t } from '@/i18n';
+import { PUZZLES, getPuzzleById } from '@/data/puzzles';
 
 const FOCUS_STROKE = 0xffeecc;
 const UNFOCUS_STROKE = 0x777777;
@@ -46,7 +47,7 @@ const UNFOCUS_TEXT = '#ccc';
 const BTN_W = 240;
 const BTN_H = 42;
 
-type ActionKey = 'retry' | 'menu';
+type ActionKey = 'retry' | 'menu' | 'next';
 
 interface ActionCard {
   key: ActionKey;
@@ -186,10 +187,18 @@ export class ResultScene extends Phaser.Scene {
     // Save high score (after the comparison above).
     SaveManager.get().recordResult(this.resultData);
 
-    // Action buttons — vertically stacked. Retry first so it's the default
-    // selection (common request: "let me try again").
-    this.buildAction(w / 2, h * 0.74, 'retry', t('result.puzzle.retry'));
-    this.buildAction(w / 2, h * 0.82, 'menu', t('vs.back'));
+    // Action buttons — vertically stacked. For puzzle wins we show
+    // [Próximo, Refazer, Menu]: clearing this puzzle unlocked the next, so
+    // the natural default is to move forward instead of re-doing.
+    const nextPuzzleId = this.nextPuzzleId();
+    if (nextPuzzleId !== null) {
+      this.buildAction(w / 2, h * 0.7, 'next', t('result.puzzle.next'));
+      this.buildAction(w / 2, h * 0.77, 'retry', t('result.puzzle.retry'));
+      this.buildAction(w / 2, h * 0.84, 'menu', t('vs.back'));
+    } else {
+      this.buildAction(w / 2, h * 0.74, 'retry', t('result.puzzle.retry'));
+      this.buildAction(w / 2, h * 0.82, 'menu', t('vs.back'));
+    }
 
     // Hint line at the bottom — reused from the Vs hint key.
     this.add
@@ -418,6 +427,8 @@ export class ResultScene extends Phaser.Scene {
     if (!action) return;
     if (action.key === 'retry') {
       this.goRetry();
+    } else if (action.key === 'next') {
+      this.goNextPuzzle();
     } else {
       this.goMenu();
     }
@@ -427,12 +438,43 @@ export class ResultScene extends Phaser.Scene {
     this.scene.stop('GameScene');
     this.scene.stop('HUDScene');
     this.scene.stop('PauseScene');
-    // Re-launch GameScene with just the mode kind. Mode-specific defaults
-    // (puzzle id, time limits, stage params) are re-applied by GameScene's
-    // own init fallbacks. Adventure stages never route here so we don't
-    // need to forward an adventureStageId.
-    this.scene.start('GameScene', { mode: this.resultData.mode });
+    // Re-launch GameScene with the same mode kind, forwarding the puzzle id
+    // when we have one so Refazer goes back into the SAME puzzle instead of
+    // falling back to the first catalog entry.
+    const payload: { mode: string; puzzleId?: string } = {
+      mode: this.resultData.mode,
+    };
+    if (this.resultData.mode === 'puzzle' && this.resultData.puzzleId) {
+      payload.puzzleId = this.resultData.puzzleId;
+    }
+    this.scene.start('GameScene', payload);
     this.scene.stop();
+  }
+
+  private goNextPuzzle(): void {
+    const nextId = this.nextPuzzleId();
+    if (nextId === null) {
+      this.goRetry();
+      return;
+    }
+    this.scene.stop('GameScene');
+    this.scene.stop('HUDScene');
+    this.scene.stop('PauseScene');
+    this.scene.start('GameScene', { mode: 'puzzle', puzzleId: nextId });
+    this.scene.stop();
+  }
+
+  /** Returns the next puzzle id if (a) we just cleared a puzzle, (b) there
+   * is a next puzzle in the catalog. Returns null otherwise. */
+  private nextPuzzleId(): string | null {
+    if (this.resultData.mode !== 'puzzle') return null;
+    if (this.resultData.stars === undefined) return null;
+    const currentId = this.resultData.puzzleId;
+    if (!currentId) return null;
+    if (!getPuzzleById(currentId)) return null;
+    const idx = PUZZLES.findIndex((p) => p.id === currentId);
+    if (idx < 0 || idx >= PUZZLES.length - 1) return null;
+    return PUZZLES[idx + 1].id;
   }
 
   private goMenu(): void {

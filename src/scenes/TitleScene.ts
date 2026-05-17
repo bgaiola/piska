@@ -33,6 +33,9 @@ export class TitleScene extends Phaser.Scene {
   private stars: Phaser.GameObjects.Rectangle[] = [];
   private starTweens: Phaser.Tweens.Tween[] = [];
   private btnPulseTween: Phaser.Tweens.Tween | null = null;
+  // Set by the About-pill pointerdown so the canvas-wide pointerup handler
+  // skips starting the game on the same tap.
+  private suppressNextTapToPlay = false;
 
   constructor() {
     super('TitleScene');
@@ -174,8 +177,16 @@ export class TitleScene extends Phaser.Scene {
     btnBg.on('pointerup', () => this.go());
 
     // Tap anywhere on the canvas also starts the game — a safety net for
-    // players who miss the button by a few pixels.
-    this.input.on('pointerup', () => this.go());
+    // players who miss the button by a few pixels. The About-pill handler
+    // sets `this.suppressNextTapToPlay` so its tap doesn't double-fire as
+    // both "open about" and "start game".
+    this.input.on('pointerup', () => {
+      if (this.suppressNextTapToPlay) {
+        this.suppressNextTapToPlay = false;
+        return;
+      }
+      this.go();
+    });
 
     this.objects.push(btnBg, btnLabel);
 
@@ -213,6 +224,41 @@ export class TitleScene extends Phaser.Scene {
         .setOrigin(0.5, 1)
         .setLineSpacing(4),
     );
+
+    // Small "SOBRE" pill in the bottom-right corner. Tap-only — the player
+    // never NEEDS to see this scene to play, so we keep it out of keyboard
+    // focus and hint flow. The dedicatória above gives players who don't
+    // tap a hint that there's more story behind the game.
+    const aboutBtn = this.add.container(width - 18, 18);
+    const aboutBg = this.add
+      .rectangle(0, 0, 70, 26, 0x251338, 0.9)
+      .setStrokeStyle(2, 0xffcc55, 1);
+    const aboutLabel = this.add
+      .text(0, 0, t('title.about'), {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#ffe',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+    aboutBtn.add([aboutBg, aboutLabel]);
+    aboutBtn.setSize(70, 26);
+    aboutBg.setInteractive({ useHandCursor: true });
+    aboutBg.on('pointerover', () => {
+      aboutBg.setFillStyle(0x36204c, 0.95);
+    });
+    aboutBg.on('pointerout', () => {
+      aboutBg.setFillStyle(0x251338, 0.9);
+    });
+    aboutBg.on('pointerdown', () => {
+      // Flag the pending pointerup so the canvas-wide handler does not also
+      // start the game on the same finger lift.
+      this.suppressNextTapToPlay = true;
+    });
+    aboutBg.on('pointerup', () => {
+      this.scene.start('AboutScene');
+    });
+    this.objects.push(aboutBtn);
   }
 
   private go(): void {

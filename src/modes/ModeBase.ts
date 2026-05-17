@@ -37,6 +37,10 @@ export interface ModeResultData {
   movesUsed?: number;
   movesAllowed?: number;
   stars?: 1 | 2 | 3;
+  /** Puzzle id, when mode === 'puzzle'. Used by SaveManager to key per-puzzle
+   * stars and by ResultScene to surface a "Próximo" button when the next
+   * puzzle in the catalog has been unlocked. */
+  puzzleId?: string;
 }
 
 export abstract class ModeBase implements ModeContext {

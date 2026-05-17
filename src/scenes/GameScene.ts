@@ -31,7 +31,7 @@ import type { Block, BlockColor, EngineConfig, EngineEvent } from '@/engine';
 import { setupDefaultInputs } from '@/engine/input/setupDefaultInputs';
 import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
-import { BLOCK_COLOR_HEX, BLOCK_SIZE_LOGICAL, BLOCK_SYMBOL, darken } from '@/config';
+import { BLOCK_COLOR_HEX, BLOCK_SIZE_LOGICAL, BLOCK_SYMBOL } from '@/config';
 import {
   EndlessMode,
   PuzzleMode,
@@ -45,6 +45,8 @@ import { spawnClearBurst } from '@/engine/ParticleFX';
 import { getStageById, computeStarsForStage } from '@/data/stages';
 import { getPuzzleById, PUZZLES, type PuzzleDef } from '@/data/puzzles';
 import { haptic, HAPTIC } from '@/utils/haptics';
+import { virtualButtonReserve } from '@/utils/virtualButtonReserve';
+import { drawBeveledBlock, drawFlashBlock } from '@/ui/drawBeveledBlock';
 
 interface GameSceneInit {
   mode?: GameMode;
@@ -296,6 +298,7 @@ export class GameScene extends Phaser.Scene {
         const def = this.resolvePuzzleDef();
         return new PuzzleMode(this.engine, {
           movesAllowed: this.modeInit.movesAllowed ?? def.movesAllowed,
+          puzzleId: def.id,
         });
       }
       case 'endless':
@@ -409,7 +412,7 @@ export class GameScene extends Phaser.Scene {
       if (!block || block.kind === 'garbage') continue;
       const cx = this.boardOrigin.x + (c.col + 0.5) * cellSize;
       const cy = this.boardOrigin.y + (c.row + 0.5) * cellSize - riseShift;
-      spawnClearBurst(this, cx, cy, BLOCK_COLOR_HEX[block.color]);
+      spawnClearBurst(this, cx, cy, BLOCK_COLOR_HEX[block.color], cellSize);
     }
 
     if (e.chain >= 3 || e.comboSize >= 5) {
@@ -498,26 +501,41 @@ export class GameScene extends Phaser.Scene {
 
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
-    const fillColor = flashWhite
-      ? 0xffffff
-      : BLOCK_COLOR_HEX[block.color as BlockColor];
-    const outlineColor = darken(BLOCK_COLOR_HEX[block.color as BlockColor], 0.5);
+    const blockColor = BLOCK_COLOR_HEX[block.color as BlockColor];
 
-    const rect = this.add.rectangle(cx, cy, cellSize - 2, cellSize - 2, fillColor, alpha);
-    rect.setStrokeStyle(1, outlineColor, alpha);
-    rect.setScale(scale);
+    const blockContainer = flashWhite
+      ? drawFlashBlock({
+          scene: this,
+          parent: this.blocks,
+          x: cx,
+          y: cy,
+          size: cellSize,
+        })
+      : drawBeveledBlock({
+          scene: this,
+          parent: this.blocks,
+          x: cx,
+          y: cy,
+          size: cellSize,
+          color: blockColor,
+        });
+    blockContainer.setAlpha(alpha);
+    blockContainer.setScale(scale);
 
+    // Symbol overlay — kept outside the bevel container so we can render it
+    // bigger now that the bevel fills the cell (was 12px, bumped to a
+    // size-scaled value for legibility on larger boards).
+    const symbolPx = Math.max(10, Math.floor(cellSize * 0.42));
     const label = this.add
       .text(cx, cy, BLOCK_SYMBOL[block.color as BlockColor], {
         fontFamily: 'monospace',
-        fontSize: '12px',
+        fontSize: `${symbolPx}px`,
         color: this.symbolColorFor(block.color),
       })
       .setOrigin(0.5)
-      .setAlpha(alpha)
+      .setAlpha(alpha * 0.92)
       .setScale(scale);
 
-    this.blocks.add(rect);
     this.blocks.add(label);
   }
 
@@ -615,23 +633,30 @@ export class GameScene extends Phaser.Scene {
   private computeBoardOrigin(): void {
     const w = this.scale.gameSize.width;
     const h = this.scale.gameSize.height;
+    const portrait = w < h;
     const cols = this.engine.grid.cols;
     const rows = this.engine.grid.rows;
 
     // Scale the cellSize so the board fills the viewport with HUD-friendly
     // margins instead of staying at a fixed 28px on a desktop monitor.
-    const HUD_TOP = 56;
-    const HUD_BOTTOM = 32;
-    const fitW = Math.floor((w - 32) / cols);
+    // Add extra reserves on touch devices so the virtual buttons (dpad + swap)
+    // don't sit on top of the playfield.
+    const vbReserve = virtualButtonReserve({ portrait });
+    const HUD_TOP = 56 + vbReserve.top;
+    const HUD_BOTTOM = 32 + vbReserve.bottom;
+    const HUD_LEFT = 16 + vbReserve.left;
+    const HUD_RIGHT = 16 + vbReserve.right;
+    const fitW = Math.floor((w - HUD_LEFT - HUD_RIGHT) / cols);
     const fitH = Math.floor((h - HUD_TOP - HUD_BOTTOM) / rows);
     const target = Math.max(BLOCK_SIZE_LOGICAL, Math.min(72, Math.min(fitW, fitH)));
     this.cellSize = target;
 
     const boardW = cols * this.cellSize;
     const boardH = rows * this.cellSize;
+    const centeredY = Math.floor(HUD_TOP + (h - HUD_TOP - HUD_BOTTOM - boardH) / 2);
     this.boardOrigin = {
       x: Math.floor((w - boardW) / 2),
-      y: Math.max(HUD_TOP, Math.floor((h - boardH) / 2)),
+      y: Math.max(HUD_TOP, centeredY),
     };
   }
 

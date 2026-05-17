@@ -10,6 +10,12 @@ const dict: TranslationDict = {
   'title.cta': 'PLAY',
   'title.prompt': 'or Space',
   'title.dedication': 'For Carina,\nwho played so much she forgot to blink.',
+  'title.about': 'ABOUT',
+
+  // About
+  'about.heading': 'ABOUT',
+  'about.dedication': 'Built by Bruno\nfor Carina\nin 2026.',
+  'about.tagline': 'PISKA is a Panel-de-Pon-flavoured block puzzle, built with love and open source.',
 
   // Mode select
   'modeselect.heading.main': 'Choose a mode',
@@ -107,7 +113,8 @@ const dict: TranslationDict = {
   'result.timeattack': 'TIME ATTACK',
   'result.stageclear': 'STAGE CLEAR',
   'result.puzzle.complete': 'PUZZLE COMPLETE',
-  'result.puzzle.retry': 'TRY AGAIN',
+  'result.puzzle.retry': 'RETRY',
+  'result.puzzle.next': 'NEXT PUZZLE →',
   'result.vs': 'VS RESULT',
   'result.generic': 'RESULT',
   'result.score': 'SCORE {{n}}',

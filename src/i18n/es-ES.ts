@@ -10,6 +10,12 @@ const dict: TranslationDict = {
   'title.cta': 'JUGAR',
   'title.prompt': 'o Espacio',
   'title.dedication': 'Para Carina,\nque jugó tanto que olvidó parpadear.',
+  'title.about': 'ACERCA DE',
+
+  // About
+  'about.heading': 'ACERCA DEL JUEGO',
+  'about.dedication': 'Hecho por Bruno\npara Carina\nen 2026.',
+  'about.tagline': 'PISKA es un puzzle de bloques al estilo Panel de Pon, hecho con cariño y código abierto.',
 
   // Mode select
   'modeselect.heading.main': 'Elige el modo',
@@ -107,7 +113,8 @@ const dict: TranslationDict = {
   'result.timeattack': 'CONTRARRELOJ',
   'result.stageclear': 'DESPEJA EL TABLERO',
   'result.puzzle.complete': 'PUZZLE COMPLETO',
-  'result.puzzle.retry': 'INTÉNTALO DE NUEVO',
+  'result.puzzle.retry': 'REINTENTAR',
+  'result.puzzle.next': 'SIGUIENTE PUZZLE →',
   'result.vs': 'RESULTADO VS',
   'result.generic': 'RESULTADO',
   'result.score': 'PUNTOS {{n}}',

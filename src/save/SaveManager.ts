@@ -120,14 +120,18 @@ export class SaveManager {
   }
 
   recordResult(r: ModeResultData): void {
-    const key = r.mode; // could be extended for puzzle id
+    // High-score / best-time are keyed per mode; puzzles get their own key
+    // namespace so each puzzle keeps its own best score and star count.
+    const puzzleKey =
+      r.mode === 'puzzle' && r.puzzleId ? `puzzle:${r.puzzleId}` : null;
+    const key = puzzleKey ?? r.mode;
     if ((this.data.highScores[key] ?? 0) < r.score) this.data.highScores[key] = r.score;
     if (r.mode === 'time-attack' || r.mode === 'stage-clear') {
       if ((this.data.bestTimes[key] ?? Infinity) > r.timeMs) this.data.bestTimes[key] = r.timeMs;
     }
-    if (r.mode === 'puzzle' && r.stars !== undefined) {
-      const prev = this.data.stars[key] ?? 0;
-      if (r.stars > prev) this.data.stars[key] = r.stars;
+    if (r.mode === 'puzzle' && r.stars !== undefined && puzzleKey !== null) {
+      const prev = this.data.stars[puzzleKey] ?? 0;
+      if (r.stars > prev) this.data.stars[puzzleKey] = r.stars;
     }
     this.save();
   }
@@ -189,6 +193,48 @@ export class SaveManager {
   setOnboardingSeen(seen: boolean): void {
     this.data.onboardingSeen = seen;
     this.save();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Puzzle progression
+  // ---------------------------------------------------------------------------
+
+  /** Stars earned on a single puzzle (0..3). */
+  getPuzzleStars(puzzleId: string): number {
+    return this.data.stars[`puzzle:${puzzleId}`] ?? 0;
+  }
+
+  /** A puzzle is "cleared" once the player has earned at least 1 star on it. */
+  isPuzzleCleared(puzzleId: string): boolean {
+    return this.getPuzzleStars(puzzleId) >= 1;
+  }
+
+  /**
+   * Puzzles unlock in order: the first one is always playable, every
+   * subsequent puzzle requires the previous one to be cleared. Pass the
+   * canonical puzzle-id ordering from the catalog.
+   */
+  isPuzzleUnlocked(orderedIds: readonly string[], targetIndex: number): boolean {
+    if (targetIndex <= 0) return true;
+    const prevId = orderedIds[targetIndex - 1];
+    if (!prevId) return true;
+    return this.isPuzzleCleared(prevId);
+  }
+
+  /** Aggregate progress across the whole puzzle catalog. */
+  getPuzzleProgress(orderedIds: readonly string[]): {
+    cleared: number;
+    totalStars: number;
+    maxStars: number;
+  } {
+    let cleared = 0;
+    let totalStars = 0;
+    for (const id of orderedIds) {
+      const s = this.getPuzzleStars(id);
+      if (s >= 1) cleared++;
+      totalStars += s;
+    }
+    return { cleared, totalStars, maxStars: orderedIds.length * 3 };
   }
 
   // ---------------------------------------------------------------------------

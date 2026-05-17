@@ -20,13 +20,15 @@ import { AIPlayer, type AIDifficulty } from '@/engine/AIPlayer';
 import { setupDefaultInputs } from '@/engine/input/setupDefaultInputs';
 import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
-import { BLOCK_COLOR_HEX, BLOCK_SYMBOL, darken } from '@/config';
+import { BLOCK_COLOR_HEX, BLOCK_SYMBOL } from '@/config';
+import { drawBeveledBlock, drawFlashBlock } from '@/ui/drawBeveledBlock';
 import { ChainPopup } from '@/ui/ChainPopup';
 import { spawnClearBurst } from '@/engine/ParticleFX';
 import { getStageById, computeStarsForStage, type StageDef } from '@/data/stages';
 import { haptic, HAPTIC } from '@/utils/haptics';
 import { CHARACTERS, type CharacterDef } from '@/data/characters';
 import { CharacterPortrait } from '@/ui/CharacterPortrait';
+import { virtualButtonReserve } from '@/utils/virtualButtonReserve';
 
 const VS_CELL_SIZE_MIN = 22;
 const VS_CELL_SIZE_MAX = 56;
@@ -183,12 +185,20 @@ export class VsScene extends Phaser.Scene {
     const cols = this.playerCols();
     const rows = this.playerRows();
 
+    // Reserve extra margins so the virtual buttons on touch devices don't
+    // overlap the playfield.
+    const vbReserve = virtualButtonReserve({ portrait });
+    const reserveTop = HUD_RESERVE_TOP + vbReserve.top;
+    const reserveBottom = HUD_RESERVE_BOTTOM + vbReserve.bottom;
+    const reserveLeft = 16 + vbReserve.left;
+    const reserveRight = 16 + vbReserve.right;
+
     // Pick the largest integer cell size that still fits both boards side by
     // side with HUD-friendly margins. Without this the cells stay at 22px and
     // look tiny on desktop monitors.
     const gap = portrait ? 16 : 80;
-    const availableW = w - 16 * 2 - gap; // gutter on each side + middle gap
-    const availableH = h - HUD_RESERVE_TOP - HUD_RESERVE_BOTTOM;
+    const availableW = w - reserveLeft - reserveRight - gap;
+    const availableH = h - reserveTop - reserveBottom;
     const fitByWidth = Math.floor(availableW / (cols * 2));
     const fitByHeight = Math.floor(availableH / rows);
     const cellSize = Math.max(
@@ -201,7 +211,10 @@ export class VsScene extends Phaser.Scene {
     const boardH = rows * cellSize;
     const totalW = boardW * 2 + gap;
     const baseX = Math.floor((w - totalW) / 2);
-    const baseY = Math.max(HUD_RESERVE_TOP, Math.floor((h - boardH) / 2));
+    const centeredY = Math.floor(
+      reserveTop + (h - reserveTop - reserveBottom - boardH) / 2,
+    );
+    const baseY = Math.max(reserveTop, centeredY);
     this.playerOrigin = { x: baseX, y: baseY };
     this.aiOrigin = { x: baseX + boardW + gap, y: baseY };
   }
@@ -520,26 +533,37 @@ export class VsScene extends Phaser.Scene {
       return;
     }
 
-    const fillColor = flashWhite
-      ? 0xffffff
-      : BLOCK_COLOR_HEX[block.color as BlockColor];
-    const outlineColor = darken(BLOCK_COLOR_HEX[block.color as BlockColor], 0.5);
+    const blockColor = BLOCK_COLOR_HEX[block.color as BlockColor];
+    const blockObj = flashWhite
+      ? drawFlashBlock({
+          scene: this,
+          parent: container,
+          x: cx,
+          y: cy,
+          size: cellSize,
+        })
+      : drawBeveledBlock({
+          scene: this,
+          parent: container,
+          x: cx,
+          y: cy,
+          size: cellSize,
+          color: blockColor,
+        });
+    blockObj.setAlpha(alpha);
+    blockObj.setScale(scale);
 
-    const rect = this.add.rectangle(cx, cy, cellSize - 2, cellSize - 2, fillColor, alpha);
-    rect.setStrokeStyle(1, outlineColor, alpha);
-    rect.setScale(scale);
-
+    const symbolPx = Math.max(8, Math.floor(cellSize * 0.42));
     const label = this.add
       .text(cx, cy, BLOCK_SYMBOL[block.color as BlockColor], {
         fontFamily: 'monospace',
-        fontSize: '10px',
+        fontSize: `${symbolPx}px`,
         color: this.symbolColorFor(block.color),
       })
       .setOrigin(0.5)
-      .setAlpha(alpha)
+      .setAlpha(alpha * 0.92)
       .setScale(scale);
 
-    container.add(rect);
     container.add(label);
   }
 
@@ -692,7 +716,7 @@ export class VsScene extends Phaser.Scene {
       if (!block || block.kind === 'garbage') continue;
       const cx = originX + (c.col + 0.5) * cellSize;
       const cy = originY + (c.row + 0.5) * cellSize - riseShift;
-      spawnClearBurst(this, cx, cy, BLOCK_COLOR_HEX[block.color]);
+      spawnClearBurst(this, cx, cy, BLOCK_COLOR_HEX[block.color], this.cellSize);
     }
 
     if (e.chain >= 3 || e.comboSize >= 5) {

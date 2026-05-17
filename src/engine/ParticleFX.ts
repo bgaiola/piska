@@ -40,12 +40,12 @@ function getEmitter(
   if (!scene.textures.exists('pixel')) return null;
 
   const emitter = scene.add.particles(0, 0, 'pixel', {
-    lifespan: 380,
-    speed: { min: 40, max: 110 },
+    lifespan: { min: 420, max: 620 },
+    speed: { min: 60, max: 180 },
     angle: { min: 0, max: 360 },
-    scale: { start: 1.4, end: 0 },
+    scale: { start: 2.2, end: 0 },
     alpha: { start: 1, end: 0 },
-    gravityY: 160,
+    gravityY: 200,
     rotate: { min: 0, max: 360 },
     emitting: false,
   });
@@ -63,20 +63,62 @@ function getEmitter(
 }
 
 /**
- * Spawns 3-5 colored pixel sparks at (x, y). Color is an integer hex tint;
- * callers typically pass BLOCK_COLOR_HEX[block.color].
+ * Spawns 6-10 colored pixel sparks at (x, y) plus a brief radial flash ring
+ * sized to (or slightly bigger than) a single grid cell. The flash sells the
+ * "pop" beyond the particle scatter — without it, clears feel papery on
+ * darker backdrops.
+ *
+ * `color` is an integer hex tint; callers typically pass
+ * BLOCK_COLOR_HEX[block.color]. `cellSize` is optional and defaults to a
+ * conservative value; pass the actual rendered cell size for a flash that
+ * always matches the visual scale of the block.
  */
 export function spawnClearBurst(
   scene: Phaser.Scene,
   x: number,
   y: number,
   color: number,
+  cellSize = 28,
 ): void {
   const emitter = getEmitter(scene);
-  if (!emitter) return;
-  const count = 3 + Math.floor(Math.random() * 3); // 3..5
-  emitter.setParticleTint(color);
-  emitter.emitParticleAt(x, y, count);
+  if (emitter !== null) {
+    const count = 6 + Math.floor(Math.random() * 5); // 6..10
+    emitter.setParticleTint(color);
+    emitter.emitParticleAt(x, y, count);
+  }
+
+  // Radial flash — a brightened ring that scales outward and fades. Drawn
+  // each call (cheap; only a handful per second) so we don't worry about
+  // pooling. Sits below the particle emitter so the sparks read on top.
+  const startSize = Math.max(8, cellSize * 0.9);
+  const endSize = Math.max(startSize * 2.2, cellSize * 2.6);
+  const flash = scene.add.rectangle(x, y, startSize, startSize, 0xffffff, 0.7);
+  flash.setDepth(8_990);
+  flash.setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({
+    targets: flash,
+    width: endSize,
+    height: endSize,
+    alpha: 0,
+    duration: 260,
+    ease: 'Cubic.easeOut',
+    onComplete: () => flash.destroy(),
+  });
+
+  // Coloured echo behind the flash — keeps the block's identity visible at
+  // the moment of the clear so big chains read as chromatic, not just white.
+  const echo = scene.add.rectangle(x, y, startSize * 0.7, startSize * 0.7, color, 0.55);
+  echo.setDepth(8_980);
+  echo.setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({
+    targets: echo,
+    width: endSize * 0.85,
+    height: endSize * 0.85,
+    alpha: 0,
+    duration: 340,
+    ease: 'Cubic.easeOut',
+    onComplete: () => echo.destroy(),
+  });
 }
 
 function getSparkleEmitter(

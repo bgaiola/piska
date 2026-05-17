@@ -123,6 +123,10 @@ export class BGMPlayer {
     }
   }
 
+  isMuted(): boolean {
+    return this.mutedVolume !== null;
+  }
+
   isPlaying(): boolean {
     return this.sequencer.isPlaying();
   }

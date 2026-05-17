@@ -21,6 +21,9 @@ import { ModeBase, type ModeResultData } from './ModeBase';
 
 export interface PuzzleParams {
   movesAllowed: number;
+  /** Catalog id of the puzzle, surfaced in the result snapshot so SaveManager
+   * can store stars per puzzle and ResultScene can advance to the next one. */
+  puzzleId?: string;
 }
 
 export class PuzzleMode extends ModeBase {
@@ -101,6 +104,7 @@ export class PuzzleMode extends ModeBase {
       movesUsed: this.movesUsed,
       movesAllowed: this.params.movesAllowed,
       stars,
+      puzzleId: this.params.puzzleId,
     };
   }
 }

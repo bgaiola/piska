@@ -25,9 +25,11 @@ import {
 import { setupDefaultInputs } from '@/engine/input/setupDefaultInputs';
 import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
-import { BLOCK_COLOR_HEX, BLOCK_SYMBOL, darken } from '@/config';
+import { BLOCK_COLOR_HEX, BLOCK_SYMBOL } from '@/config';
+import { drawBeveledBlock, drawFlashBlock } from '@/ui/drawBeveledBlock';
 import type { BoardSnapshot, OnlineMessage, OnlinePeer, OnlineRole } from '@/net/OnlinePeer';
 import { haptic, HAPTIC } from '@/utils/haptics';
+import { virtualButtonReserve } from '@/utils/virtualButtonReserve';
 
 const VS_CELL_SIZE_MIN = 22;
 const VS_CELL_SIZE_MAX = 56;
@@ -199,9 +201,18 @@ export class OnlineVsScene extends Phaser.Scene {
     const portrait = w < h;
     const cols = this.myCols();
     const rows = this.myRows();
+
+    // Reserve extra margins so the virtual buttons on touch devices don't
+    // overlap the playfield.
+    const vbReserve = virtualButtonReserve({ portrait });
+    const reserveTop = HUD_RESERVE_TOP + vbReserve.top;
+    const reserveBottom = HUD_RESERVE_BOTTOM + vbReserve.bottom;
+    const reserveLeft = 16 + vbReserve.left;
+    const reserveRight = 16 + vbReserve.right;
+
     const gap = portrait ? 16 : 80;
-    const availableW = w - 16 * 2 - gap;
-    const availableH = h - HUD_RESERVE_TOP - HUD_RESERVE_BOTTOM;
+    const availableW = w - reserveLeft - reserveRight - gap;
+    const availableH = h - reserveTop - reserveBottom;
     const fitByWidth = Math.floor(availableW / (cols * 2));
     const fitByHeight = Math.floor(availableH / rows);
     this.cellSize = Math.max(
@@ -212,7 +223,10 @@ export class OnlineVsScene extends Phaser.Scene {
     const boardH = rows * this.cellSize;
     const totalW = boardW * 2 + gap;
     const baseX = Math.floor((w - totalW) / 2);
-    const baseY = Math.max(HUD_RESERVE_TOP, Math.floor((h - boardH) / 2));
+    const centeredY = Math.floor(
+      reserveTop + (h - reserveTop - reserveBottom - boardH) / 2,
+    );
+    const baseY = Math.max(reserveTop, centeredY);
     this.playerOrigin = { x: baseX, y: baseY };
     this.opponentOrigin = { x: baseX + boardW + gap, y: baseY };
   }
@@ -469,23 +483,30 @@ export class OnlineVsScene extends Phaser.Scene {
     alpha: number,
     flashWhite: boolean,
   ): void {
-    const fillColor = flashWhite ? 0xffffff : BLOCK_COLOR_HEX[color];
-    const outlineColor = darken(BLOCK_COLOR_HEX[color], 0.5);
-    const rect = this.add.rectangle(cx, cy, cellSize - 2, cellSize - 2, fillColor, alpha);
-    rect.setStrokeStyle(1, outlineColor, alpha);
-    rect.setScale(scale);
+    const blockObj = flashWhite
+      ? drawFlashBlock({ scene: this, parent: container, x: cx, y: cy, size: cellSize })
+      : drawBeveledBlock({
+          scene: this,
+          parent: container,
+          x: cx,
+          y: cy,
+          size: cellSize,
+          color: BLOCK_COLOR_HEX[color],
+        });
+    blockObj.setAlpha(alpha);
+    blockObj.setScale(scale);
 
+    const symbolPx = Math.max(8, Math.floor(cellSize * 0.42));
     const label = this.add
       .text(cx, cy, BLOCK_SYMBOL[color], {
         fontFamily: 'monospace',
-        fontSize: '10px',
+        fontSize: `${symbolPx}px`,
         color: this.symbolColorFor(color),
       })
       .setOrigin(0.5)
-      .setAlpha(alpha)
+      .setAlpha(alpha * 0.92)
       .setScale(scale);
 
-    container.add(rect);
     container.add(label);
   }
 

@@ -52,12 +52,31 @@ const MAIN_CARDS: CardSpec[] = [
   { key: 'puzzle', labelKey: 'modeselect.puzzle.label', subtitleKey: 'modeselect.puzzle.subtitle' },
 ];
 
-const PUZZLE_CARDS: Array<CardSpec & { puzzleId: string }> = PUZZLES.map((p) => ({
-  key: `puzzle-${p.id}`,
-  puzzleId: p.id,
-  labelKey: `puzzle.${p.id}.label`,
-  subtitleKey: `puzzle.${p.id}.subtitle`,
-}));
+interface PuzzleCardSpec extends CardSpec {
+  puzzleId: string;
+  /** 1-based catalog index, used for the "#01" number on the card. */
+  index: number;
+  stars: number;
+  locked: boolean;
+}
+
+function buildPuzzleCards(): PuzzleCardSpec[] {
+  const save = SaveManager.get();
+  const ids = PUZZLES.map((p) => p.id);
+  return PUZZLES.map((p, i) => {
+    const locked = !save.isPuzzleUnlocked(ids, i);
+    return {
+      key: `puzzle-${p.id}`,
+      puzzleId: p.id,
+      index: i + 1,
+      stars: save.getPuzzleStars(p.id),
+      locked,
+      disabled: locked,
+      labelKey: `puzzle.${p.id}.label`,
+      subtitleKey: `puzzle.${p.id}.subtitle`,
+    };
+  });
+}
 
 const DIFFICULTY_CARDS: Array<CardSpec & { difficulty: AIDifficulty }> = [
   { key: 'easy', difficulty: 'easy', labelKey: 'difficulty.easy.label', subtitleKey: 'difficulty.easy.subtitle' },
@@ -169,26 +188,39 @@ export class ModeSelectScene extends Phaser.Scene {
       this.gearButton = this.buildGearButton(w - 18, titleY);
     }
 
-    const cards: CardSpec[] =
-      this.mode === 'main'
+    const puzzlePickerActive = this.mode === 'puzzle-picker';
+    const puzzleCards: PuzzleCardSpec[] = puzzlePickerActive ? buildPuzzleCards() : [];
+    const cards: CardSpec[] = puzzlePickerActive
+      ? puzzleCards
+      : this.mode === 'main'
         ? MAIN_CARDS
-        : this.mode === 'vs-difficulty'
-          ? DIFFICULTY_CARDS
-          : PUZZLE_CARDS;
+        : DIFFICULTY_CARDS;
 
-    // Decide layout: vertical (1 col) in portrait, grid in landscape.
-    const headerArea = titleY + 16;
+    // Optional progress header for the puzzle picker so the player can see
+    // "X/24 puzzles, Y/72 estrelas" at a glance instead of having to count
+    // the cards by hand.
+    let headerArea = titleY + 16;
+    if (puzzlePickerActive) {
+      headerArea = this.drawPuzzleProgress(w, titleY) + 8;
+    }
+
+    // Decide layout: 2-col grid for the puzzle picker (24 cards never fit in
+    // a single column), 1-col for the main / difficulty menus unless we're on
+    // a very short landscape screen.
     const footerArea = 22;
     const available = h - headerArea - footerArea;
     const gap = h < 420 ? 6 : CARD_GAP;
-    const useGrid = h < 480 && cards.length > 3;
+    const useGrid = puzzlePickerActive || (h < 480 && cards.length > 3);
     const cols = useGrid ? 2 : 1;
     const rows = Math.ceil(cards.length / cols);
 
-    // Compute card height to fit.
+    // Compute card height to fit. Puzzle cards can be more compact since
+    // we display a numbered single-line layout.
+    const minCardH = puzzlePickerActive ? 32 : 40;
+    const maxCardH = puzzlePickerActive ? 56 : CARD_HEIGHT;
     const cardHeight = Math.min(
-      CARD_HEIGHT,
-      Math.max(40, Math.floor((available - (rows - 1) * gap) / rows)),
+      maxCardH,
+      Math.max(minCardH, Math.floor((available - (rows - 1) * gap) / rows)),
     );
     const cardWidth = useGrid ? Math.min(CARD_WIDTH, Math.floor((w - 60) / 2)) : CARD_WIDTH;
 
@@ -202,10 +234,22 @@ export class ModeSelectScene extends Phaser.Scene {
       const cx = useGrid
         ? Math.floor(w / 2) + (c === 0 ? -1 : 1) * Math.floor((cardWidth + 16) / 2)
         : Math.floor(w / 2);
-      const container = this.buildCard(spec, idx, cardWidth, cardHeight);
+      const container = puzzlePickerActive
+        ? this.buildPuzzleCard(spec as PuzzleCardSpec, idx, cardWidth, cardHeight)
+        : this.buildCard(spec, idx, cardWidth, cardHeight);
       container.setPosition(cx, cy);
       this.cardObjects.push(container);
     });
+
+    // Default puzzle-picker focus to the first not-yet-cleared puzzle so the
+    // player lands on what they actually need to do next. Falls back to 0
+    // when every puzzle has at least one star.
+    if (puzzlePickerActive && this.cursor === 0) {
+      const firstUnclearedIdx = puzzleCards.findIndex(
+        (c) => !c.locked && c.stars === 0,
+      );
+      if (firstUnclearedIdx >= 0) this.cursor = firstUnclearedIdx;
+    }
 
     const hint =
       this.mode === 'main'
@@ -223,6 +267,144 @@ export class ModeSelectScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.refreshFocus();
+  }
+
+  /**
+   * Draws the puzzle-mode progress strip directly under the title. Returns
+   * the Y baseline below which the picker grid can start.
+   *
+   * Layout (top → bottom): bold counter ("12 / 24 PUZZLES"), star tally,
+   * thin horizontal progress bar. All drawn as scene-children so the next
+   * `drawScreen` tears them down via `cleanup`.
+   */
+  private drawPuzzleProgress(w: number, titleY: number): number {
+    const ids = PUZZLES.map((p) => p.id);
+    const prog = SaveManager.get().getPuzzleProgress(ids);
+    const baseY = titleY + 22;
+
+    this.add
+      .text(w / 2, baseY, `${prog.cleared} / ${ids.length} PUZZLES`, {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: FOCUS_TEXT,
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(
+        w / 2,
+        baseY + 14,
+        `★ ${prog.totalStars} / ${prog.maxStars}`,
+        {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#ffe35a',
+        },
+      )
+      .setOrigin(0.5);
+
+    // Progress bar — sits below the counter. Width capped so it doesn't
+    // span the entire viewport on wide screens.
+    const barW = Math.min(220, Math.max(140, Math.floor(w * 0.55)));
+    const barH = 6;
+    const barX = Math.floor((w - barW) / 2);
+    const barY = baseY + 24;
+    const ratio = prog.maxStars > 0 ? prog.totalStars / prog.maxStars : 0;
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x1a0a22, 1);
+    bg.fillRect(barX, barY, barW, barH);
+    bg.lineStyle(1, 0x4d2f60, 1);
+    bg.strokeRect(barX, barY, barW, barH);
+
+    if (ratio > 0) {
+      const fill = this.add.graphics();
+      // Warm gold gradient feel without an actual gradient: two stacked rects.
+      fill.fillStyle(0xffd935, 1);
+      fill.fillRect(barX, barY, Math.floor(barW * ratio), barH);
+      fill.fillStyle(0xffe35a, 0.7);
+      fill.fillRect(barX, barY, Math.floor(barW * ratio), Math.floor(barH / 2));
+    }
+
+    return barY + barH;
+  }
+
+  private buildPuzzleCard(
+    spec: PuzzleCardSpec,
+    idx: number,
+    width: number,
+    height: number,
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(0, 0);
+    const locked = spec.locked;
+
+    const baseFill = locked ? 0x1a0c22 : 0x251338;
+    const baseStroke = locked ? 0x3a2444 : UNFOCUS_COLOR;
+    const bg = this.add
+      .rectangle(0, 0, width, height, baseFill, 0.95)
+      .setStrokeStyle(2, baseStroke, 1);
+    bg.setName('bg');
+
+    // Left side: #NN. Centered: short name. Right side: stars or lock icon.
+    const padX = 8;
+    const num = this.add
+      .text(-width / 2 + padX, 0, `#${String(spec.index).padStart(2, '0')}`, {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: locked ? '#555' : '#88a',
+      })
+      .setOrigin(0, 0.5);
+
+    const nameColor = locked ? DISABLED_TEXT : UNFOCUS_TEXT;
+    const name = this.add
+      .text(0, 0, t(spec.labelKey), {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: nameColor,
+      })
+      .setOrigin(0.5);
+    name.setName('label');
+
+    // Right side: lock icon when locked, else a "★★☆" tri-star widget.
+    const rightText = locked
+      ? '\u{1F512}'
+      : this.starString(spec.stars);
+    const rightColor = locked
+      ? '#777'
+      : spec.stars > 0
+        ? '#ffe35a'
+        : '#666';
+    const right = this.add
+      .text(width / 2 - padX, 0, rightText, {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: rightColor,
+      })
+      .setOrigin(1, 0.5);
+    right.setName('right');
+    container.add([bg, num, name, right]);
+
+    container.setSize(width, height);
+    container.setData('spec', spec);
+    container.setData('index', idx);
+
+    bg.setInteractive({ useHandCursor: !locked });
+    bg.on('pointerover', () => {
+      this.cursor = idx;
+      this.refreshFocus();
+    });
+    bg.on('pointerdown', () => {
+      this.cursor = idx;
+      this.refreshFocus();
+      this.confirm();
+    });
+
+    return container;
+  }
+
+  private starString(n: number): string {
+    const safe = Math.max(0, Math.min(3, n));
+    return '★'.repeat(safe) + '☆'.repeat(3 - safe);
   }
 
   private buildGearButton(cx: number, cy: number): Phaser.GameObjects.Container {
@@ -353,7 +535,11 @@ export class ModeSelectScene extends Phaser.Scene {
     };
 
     const onDown = (e: KeyboardEvent): void => {
-      const grid = this.scale.gameSize.height < 480 && this.cardObjects.length > 3;
+      // Puzzle picker always uses a 2-col grid; otherwise we only switch to
+      // 2-col on very short screens with more than three cards.
+      const grid =
+        this.mode === 'puzzle-picker' ||
+        (this.scale.gameSize.height < 480 && this.cardObjects.length > 3);
       const cols = grid ? 2 : 1;
       switch (e.key) {
         case 'ArrowUp':
@@ -511,7 +697,11 @@ export class ModeSelectScene extends Phaser.Scene {
     if (this.mode === 'puzzle-picker') {
       const card = this.cardObjects[this.cursor];
       if (!card) return;
-      const spec = card.getData('spec') as CardSpec & { puzzleId: string };
+      const spec = card.getData('spec') as PuzzleCardSpec;
+      if (spec.locked) {
+        this.shakeCard(card);
+        return;
+      }
       this.scene.start('GameScene', { mode: 'puzzle', puzzleId: spec.puzzleId });
       return;
     }
