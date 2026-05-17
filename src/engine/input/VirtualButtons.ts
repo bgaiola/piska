@@ -293,43 +293,77 @@ export class VirtualButtons {
   }
 
   private bindRaise(): void {
+    // Raise is a HOLD-to-act button. Capture the pointer on press so finger
+    // drift doesn't drop the hold — without capture, a 1-2px slide off the
+    // edge fires pointerleave and ends the rise mid-stack-up. pointercancel
+    // (system steal) still ends the hold; pointerleave does not.
     this.raiseBtn.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
       this.raiseBtn.classList.add('is-pressed');
+      try {
+        this.raiseBtn.setPointerCapture(ev.pointerId);
+      } catch {
+        // some browsers refuse; the hold still works while the finger
+        // stays on the button itself.
+      }
       this.emit('raisePress', {});
     });
-    const release = (): void => {
+    const release = (ev: PointerEvent): void => {
       if (!this.raiseBtn.classList.contains('is-pressed')) return;
       this.raiseBtn.classList.remove('is-pressed');
+      try {
+        if (this.raiseBtn.hasPointerCapture(ev.pointerId)) {
+          this.raiseBtn.releasePointerCapture(ev.pointerId);
+        }
+      } catch {
+        // ignore
+      }
       this.emit('raiseRelease', {});
     };
     this.raiseBtn.addEventListener('pointerup', release);
     this.raiseBtn.addEventListener('pointercancel', release);
-    this.raiseBtn.addEventListener('pointerleave', release);
   }
 
   private bindPause(): void {
-    // Fire the action on pointerup (matching the JOGAR button pattern that
-    // proved reliable on iOS Safari). The previous pointerdown handler was
-    // intermittently failing on touch — possibly the synthesized click
-    // sequence racing the preventDefault. pointerup is what mobile players
-    // expect anyway ("button fires when finger lifts").
+    // Pause/MENU is 72×44 — small enough that finger drift can slide the
+    // pointer outside the button between pointerdown and pointerup, so we
+    // CAPTURE the pointer on press. That keeps every subsequent pointer
+    // event glued to this element no matter where the finger ends up, and
+    // pointerup fires reliably even if the finger drifted off the visible
+    // bounds. pointerleave is intentionally NOT a release path — leaving
+    // would only mean "you slid off the visual button", not "you let go".
+    // pointercancel still aborts (the system took control, e.g. notification
+    // shade swipe).
     let pressed = false;
     this.pauseBtn.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
       pressed = true;
       this.pauseBtn.classList.add('is-pressed');
+      try {
+        this.pauseBtn.setPointerCapture(ev.pointerId);
+      } catch {
+        // Some browsers refuse capture on non-primary touches; fine — the
+        // click fallback below covers the worst case.
+      }
     });
-    const release = (fireEmit: boolean): void => {
+    const release = (ev: PointerEvent | null, fireEmit: boolean): void => {
       this.pauseBtn.classList.remove('is-pressed');
+      if (ev) {
+        try {
+          if (this.pauseBtn.hasPointerCapture(ev.pointerId)) {
+            this.pauseBtn.releasePointerCapture(ev.pointerId);
+          }
+        } catch {
+          // already released
+        }
+      }
       if (fireEmit && pressed) {
         this.emit('pause', {});
       }
       pressed = false;
     };
-    this.pauseBtn.addEventListener('pointerup', () => release(true));
-    this.pauseBtn.addEventListener('pointercancel', () => release(false));
-    this.pauseBtn.addEventListener('pointerleave', () => release(false));
+    this.pauseBtn.addEventListener('pointerup', (ev) => release(ev, true));
+    this.pauseBtn.addEventListener('pointercancel', (ev) => release(ev, false));
     // Belt and suspenders for mouse-only browsers + iOS quirks where a
     // synthesized 'click' may fire without a matching pointerup.
     this.pauseBtn.addEventListener('click', () => {

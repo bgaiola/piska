@@ -507,7 +507,11 @@ export class ModeSelectScene extends Phaser.Scene {
       if (bg !== null) {
         const adv = bg.getData('isAdventure') === true;
         const baseStroke = adv ? 0xffcc55 : UNFOCUS_COLOR;
-        bg.setStrokeStyle(adv ? 3 : 2, focused ? FOCUS_COLOR : baseStroke, 1);
+        bg.setStrokeStyle(
+          focused ? (adv ? 4 : 3) : adv ? 3 : 2,
+          focused ? FOCUS_COLOR : baseStroke,
+          1,
+        );
         bg.setFillStyle(
           focused ? (adv ? 0x4a3a22 : 0x36204c) : (adv ? 0x3a2a18 : 0x251338),
           0.95,
@@ -518,7 +522,16 @@ export class ModeSelectScene extends Phaser.Scene {
           spec.disabled ? DISABLED_TEXT : focused ? FOCUS_TEXT : UNFOCUS_TEXT,
         );
       }
-      c.setScale(focused ? 1.04 : 1);
+      // Tween the scale rather than snapping it — gives a soft elastic feel
+      // and removes the jarring jump when the player taps a different card.
+      const targetScale = focused ? 1.05 : 1;
+      this.tweens.killTweensOf(c);
+      this.tweens.add({
+        targets: c,
+        scale: targetScale,
+        duration: focused ? 140 : 90,
+        ease: focused ? 'Back.easeOut' : 'Sine.easeOut',
+      });
     });
   }
 

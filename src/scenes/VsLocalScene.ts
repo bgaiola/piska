@@ -27,6 +27,7 @@ import type { Block, BlockColor, EngineEvent } from '@/engine';
 import { BGMPlayer, SFXPlayer } from '@/audio';
 import { BLOCK_COLOR_HEX, BLOCK_SYMBOL } from '@/config';
 import { drawBeveledBlock, drawFlashBlock } from '@/ui/drawBeveledBlock';
+import { drawCursor } from '@/ui/drawCursor';
 import { ChainPopup } from '@/ui/ChainPopup';
 import { spawnClearBurst } from '@/engine/ParticleFX';
 import { haptic, HAPTIC } from '@/utils/haptics';
@@ -509,26 +510,34 @@ export class VsLocalScene extends Phaser.Scene {
     const g = this.cursorGfx;
     g.clear();
 
-    const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 180);
     const cellSize = this.cellSize;
+    const t = performance.now();
 
-    // P1 cursor.
+    // P1 cursor — cool cyan.
     {
       const { row, col } = this.p1Engine.cursor;
       const riseShift = this.p1Engine.grid.riseOffset * cellSize;
-      const x = this.p1Origin.x + col * cellSize;
-      const y = this.p1Origin.y + row * cellSize - riseShift;
-      g.lineStyle(2, 0xa6f0ff, pulse);
-      g.strokeRect(x, y, cellSize * 2, cellSize);
+      drawCursor({
+        g,
+        x: this.p1Origin.x + col * cellSize,
+        y: this.p1Origin.y + row * cellSize - riseShift,
+        cellSize,
+        timeMs: t,
+        color: 0xa6f0ff,
+      });
     }
-    // P2 cursor.
+    // P2 cursor — warm peach.
     {
       const { row, col } = this.p2Engine.cursor;
       const riseShift = this.p2Engine.grid.riseOffset * cellSize;
-      const x = this.p2Origin.x + col * cellSize;
-      const y = this.p2Origin.y + row * cellSize - riseShift;
-      g.lineStyle(2, 0xffd0a6, pulse);
-      g.strokeRect(x, y, cellSize * 2, cellSize);
+      drawCursor({
+        g,
+        x: this.p2Origin.x + col * cellSize,
+        y: this.p2Origin.y + row * cellSize - riseShift,
+        cellSize,
+        timeMs: t,
+        color: 0xffd0a6,
+      });
     }
   }
 

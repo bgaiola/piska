@@ -371,13 +371,20 @@ export class ResultScene extends Phaser.Scene {
       const bg = a.container.getByName('bg') as Phaser.GameObjects.Rectangle | null;
       const label = a.container.getByName('label') as Phaser.GameObjects.Text | null;
       if (bg !== null) {
-        bg.setStrokeStyle(2, focused ? FOCUS_STROKE : UNFOCUS_STROKE, 1);
+        bg.setStrokeStyle(focused ? 3 : 2, focused ? FOCUS_STROKE : UNFOCUS_STROKE, 1);
         bg.setFillStyle(focused ? FOCUS_FILL : UNFOCUS_FILL, 0.95);
       }
       if (label !== null) {
         label.setColor(focused ? FOCUS_TEXT : UNFOCUS_TEXT);
       }
-      a.container.setScale(focused ? 1.04 : 1);
+      // Tween the scale so swapping focus doesn't snap.
+      this.tweens.killTweensOf(a.container);
+      this.tweens.add({
+        targets: a.container,
+        scale: focused ? 1.05 : 1,
+        duration: focused ? 140 : 90,
+        ease: focused ? 'Back.easeOut' : 'Sine.easeOut',
+      });
     });
   }
 

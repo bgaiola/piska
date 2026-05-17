@@ -27,6 +27,7 @@ import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
 import { BLOCK_COLOR_HEX, BLOCK_SYMBOL } from '@/config';
 import { drawBeveledBlock, drawFlashBlock } from '@/ui/drawBeveledBlock';
+import { drawCursor } from '@/ui/drawCursor';
 import type { BoardSnapshot, OnlineMessage, OnlinePeer, OnlineRole } from '@/net/OnlinePeer';
 import { haptic, HAPTIC } from '@/utils/haptics';
 import { virtualButtonReserve } from '@/utils/virtualButtonReserve';
@@ -539,18 +540,17 @@ export class OnlineVsScene extends Phaser.Scene {
 
   private drawPlayerCursor(): void {
     if (!this.cursorGfx) return;
-    const g = this.cursorGfx;
-    g.clear();
     const { row, col } = this.myEngine.cursor;
     const cellSize = this.cellSize;
     const riseShift = this.myEngine.grid.riseOffset * cellSize;
-    const x = this.playerOrigin.x + col * cellSize;
-    const y = this.playerOrigin.y + row * cellSize - riseShift;
-    const w = cellSize * 2;
-    const h = cellSize;
-    const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 180);
-    g.lineStyle(2, 0xffffee, pulse);
-    g.strokeRect(x, y, w, h);
+    this.cursorGfx.clear();
+    drawCursor({
+      g: this.cursorGfx,
+      x: this.playerOrigin.x + col * cellSize,
+      y: this.playerOrigin.y + row * cellSize - riseShift,
+      cellSize,
+      timeMs: performance.now(),
+    });
   }
 
   private symbolColorFor(color: BlockColor): string {

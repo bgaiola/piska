@@ -22,6 +22,7 @@ import type { InputController } from '@/engine/input/InputController';
 import { BGMPlayer, SFXPlayer } from '@/audio';
 import { BLOCK_COLOR_HEX, BLOCK_SYMBOL } from '@/config';
 import { drawBeveledBlock, drawFlashBlock } from '@/ui/drawBeveledBlock';
+import { drawCursor } from '@/ui/drawCursor';
 import { ChainPopup } from '@/ui/ChainPopup';
 import { spawnClearBurst } from '@/engine/ParticleFX';
 import { getStageById, computeStarsForStage, type StageDef } from '@/data/stages';
@@ -618,26 +619,18 @@ export class VsScene extends Phaser.Scene {
 
   private drawPlayerCursor(): void {
     if (!this.cursorGfx) return;
-    const g = this.cursorGfx;
-    g.clear();
-
     const { row, col } = this.playerEngine.cursor;
     const cellSize = this.cellSize;
     const riseShift = this.playerEngine.grid.riseOffset * cellSize;
-
-    const baseX = this.playerOrigin.x + col * cellSize;
-    const baseY = this.playerOrigin.y + row * cellSize - riseShift;
-    const baseW = cellSize * 2;
-    const baseH = cellSize;
-    const s = this.cursorScale;
-    const w = baseW * s;
-    const h = baseH * s;
-    const x = baseX + (baseW - w) / 2;
-    const y = baseY + (baseH - h) / 2;
-
-    const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 180);
-    g.lineStyle(2, 0xffffee, pulse);
-    g.strokeRect(x, y, w, h);
+    this.cursorGfx.clear();
+    drawCursor({
+      g: this.cursorGfx,
+      x: this.playerOrigin.x + col * cellSize,
+      y: this.playerOrigin.y + row * cellSize - riseShift,
+      cellSize,
+      scale: this.cursorScale,
+      timeMs: performance.now(),
+    });
   }
 
   // ---------------------------------------------------------------------------

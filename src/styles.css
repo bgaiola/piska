@@ -45,31 +45,55 @@ canvas {
   touch-action: none;
 }
 
-/* ---------- Virtual buttons (mobile overlay) ---------- */
+/* ---------- Virtual buttons (mobile overlay) ----------
+ * Styled as chunky 16-bit chiclet buttons to match the beveled blocks on
+ * the playfield. Background is a saturated purple; box-shadow draws the
+ * top/left highlight + bottom/right shadow that gives the bevel its
+ * dimensional read. Press state shrinks the highlight + scales down so
+ * the button visibly "depresses" into the screen.
+ */
 
 .piska-vb {
   position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-  border-radius: 8px;
+  background: linear-gradient(180deg, #3d1c5a 0%, #2a1240 100%);
+  border: 2px solid #1a0a22;
+  color: #ffe;
+  border-radius: 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
   touch-action: none;
-  font-family: inherit;
-  font-size: 14px;
   pointer-events: auto;
+  /* Layered shadow: inner highlight on top + inner shadow on bottom for
+   * the bevel effect, plus a soft drop shadow so the button floats above
+   * the playfield. */
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.45),
+    inset 2px 0 0 rgba(255, 255, 255, 0.12),
+    inset -2px 0 0 rgba(0, 0, 0, 0.35),
+    0 3px 8px rgba(0, 0, 0, 0.5);
   transition:
-    transform 80ms ease,
-    background 80ms ease;
+    transform 70ms ease,
+    box-shadow 70ms ease,
+    filter 70ms ease;
 }
 
 .piska-vb.is-pressed {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(0.95);
+  transform: translateY(2px) scale(0.96);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.5);
+  filter: brightness(0.92);
 }
 
 .piska-vb-swap {
@@ -77,8 +101,13 @@ canvas {
   height: 80px;
   right: calc(24px + var(--safe-right));
   bottom: calc(24px + var(--safe-bottom));
-  background: rgba(220, 80, 120, 0.55);
-  font-size: 24px;
+  background: linear-gradient(180deg, #e85075 0%, #b8345a 100%);
+  border-color: #5a0e26;
+  color: #fff;
+  font-size: 28px;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(255, 200, 220, 0.4);
 }
 
 .piska-vb-raise {
@@ -86,15 +115,26 @@ canvas {
   height: 64px;
   right: calc(32px + var(--safe-right));
   bottom: calc(120px + var(--safe-bottom));
+  background: linear-gradient(180deg, #4a8eff 0%, #2a5bb8 100%);
+  border-color: #102a5a;
+  font-size: 18px;
 }
 
 .piska-vb-pause {
-  width: 72px;
-  height: 44px;
-  right: calc(16px + var(--safe-right));
-  top: calc(16px + var(--safe-top));
-  background: rgba(220, 80, 120, 0.55);
-  border-color: rgba(255, 220, 120, 0.8);
+  width: 76px;
+  height: 46px;
+  right: calc(14px + var(--safe-right));
+  top: calc(14px + var(--safe-top));
+  background: linear-gradient(180deg, #3d1c5a 0%, #2a1240 100%);
+  border-color: #ffcc55;
+  border-width: 2px;
+  color: #ffe;
+  font-size: 12px;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 220, 120, 0.25),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    0 3px 6px rgba(0, 0, 0, 0.5);
 }
 
 .piska-vb-dpad {

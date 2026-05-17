@@ -47,6 +47,7 @@ import { getPuzzleById, PUZZLES, type PuzzleDef } from '@/data/puzzles';
 import { haptic, HAPTIC } from '@/utils/haptics';
 import { virtualButtonReserve } from '@/utils/virtualButtonReserve';
 import { drawBeveledBlock, drawFlashBlock } from '@/ui/drawBeveledBlock';
+import { drawCursor } from '@/ui/drawCursor';
 
 interface GameSceneInit {
   mode?: GameMode;
@@ -556,28 +557,19 @@ export class GameScene extends Phaser.Scene {
    */
   private drawCursor(): void {
     if (!this.cursorGfx) return;
-    const g = this.cursorGfx;
-    g.clear();
-
     const { row, col } = this.engine.cursor;
     const cellSize = this.cellSize;
     const riseShift = this.engine.grid.riseOffset * cellSize;
 
-    const baseX = this.boardOrigin.x + col * cellSize;
-    const baseY = this.boardOrigin.y + row * cellSize - riseShift;
-    const baseW = cellSize * 2;
-    const baseH = cellSize;
-
-    // Scale the outline outward from its center so it breathes.
-    const s = this.cursorScale;
-    const w = baseW * s;
-    const h = baseH * s;
-    const x = baseX + (baseW - w) / 2;
-    const y = baseY + (baseH - h) / 2;
-
-    const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 180);
-    g.lineStyle(2, 0xffffee, pulse);
-    g.strokeRect(x, y, w, h);
+    this.cursorGfx.clear();
+    drawCursor({
+      g: this.cursorGfx,
+      x: this.boardOrigin.x + col * cellSize,
+      y: this.boardOrigin.y + row * cellSize - riseShift,
+      cellSize,
+      scale: this.cursorScale,
+      timeMs: performance.now(),
+    });
   }
 
   private drawBoardFrame(): void {
@@ -588,19 +580,46 @@ export class GameScene extends Phaser.Scene {
     const grid = this.engine.grid;
     const boardW = grid.cols * this.cellSize;
     const boardH = grid.rows * this.cellSize;
+    const bx = this.boardOrigin.x;
+    const by = this.boardOrigin.y;
+
+    // Outer drop shadow — three offset rectangles fading into the backdrop.
+    // Gives the playfield a sense of weight and makes the blocks pop.
+    for (let i = 3; i >= 1; i--) {
+      g.fillStyle(0x000000, 0.1 * i);
+      g.fillRect(bx - i, by + 2, boardW + i * 2, boardH + i);
+    }
 
     // Subtle interior fill so the playfield reads as a distinct surface.
-    g.fillStyle(0x0a0612, 0.85);
-    g.fillRect(this.boardOrigin.x, this.boardOrigin.y, boardW, boardH);
+    g.fillStyle(0x0a0612, 0.9);
+    g.fillRect(bx, by, boardW, boardH);
 
-    // Frame border.
-    g.lineStyle(2, 0x5a3a72, 1);
-    g.strokeRect(
-      this.boardOrigin.x - 1,
-      this.boardOrigin.y - 1,
-      boardW + 2,
-      boardH + 2,
-    );
+    // Inner bezel — a 1px dark line + 1px highlight on top/left + shadow on
+    // bottom/right. Reads as a real bevel without needing extra GameObjects.
+    g.lineStyle(1, 0x06030c, 1);
+    g.strokeRect(bx, by, boardW, boardH);
+
+    // Outer beveled frame: a thick purple border with a brighter top-left
+    // highlight and a darker bottom-right shadow.
+    const frameThick = 3;
+    // Body (purple).
+    g.fillStyle(0x3a1e58, 1);
+    // Top strip.
+    g.fillRect(bx - frameThick, by - frameThick, boardW + frameThick * 2, frameThick);
+    // Bottom strip.
+    g.fillRect(bx - frameThick, by + boardH, boardW + frameThick * 2, frameThick);
+    // Left strip.
+    g.fillRect(bx - frameThick, by, frameThick, boardH);
+    // Right strip.
+    g.fillRect(bx + boardW, by, frameThick, boardH);
+    // Highlight (top + left).
+    g.fillStyle(0xffcc55, 0.55);
+    g.fillRect(bx - frameThick, by - frameThick, boardW + frameThick * 2, 1);
+    g.fillRect(bx - frameThick, by - frameThick, 1, boardH + frameThick * 2);
+    // Shadow (bottom + right).
+    g.fillStyle(0x06030c, 0.7);
+    g.fillRect(bx - frameThick, by + boardH + frameThick - 1, boardW + frameThick * 2, 1);
+    g.fillRect(bx + boardW + frameThick - 1, by - frameThick, 1, boardH + frameThick * 2);
   }
 
   // ---------------------------------------------------------------------------

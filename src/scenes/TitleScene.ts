@@ -119,17 +119,26 @@ export class TitleScene extends Phaser.Scene {
 
     // Soft glow layer: a slightly larger, dimmer copy of the wordmark sitting
     // a couple pixels below the real one so the title appears to float above
-    // the night sky.
+    // the night sky. We pulse its alpha so the title breathes — adds life
+    // without an animated wordmark itself.
     const glow = this.add
       .text(width / 2 + 2, height * 0.22 + 3, 'PISKA', {
         fontFamily: 'monospace',
         fontSize: `${wordmarkSize}px`,
-        color: '#5a3a78',
+        color: '#ffcc55',
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setAlpha(0.55);
+      .setAlpha(0.35);
     this.objects.push(glow);
+    this.tweens.add({
+      targets: glow,
+      alpha: { from: 0.25, to: 0.65 },
+      duration: 1800,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    });
 
     const wordmark = this.add
       .text(width / 2, height * 0.22, 'PISKA', {
@@ -140,6 +149,7 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     wordmark.setStroke('#5a3a78', 4);
+    wordmark.setShadow(0, 3, '#5a3a78', 6, false, true);
     this.objects.push(wordmark);
 
     this.objects.push(
