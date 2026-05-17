@@ -225,24 +225,29 @@ export class TitleScene extends Phaser.Scene {
         .setLineSpacing(4),
     );
 
-    // Small "SOBRE" pill in the bottom-right corner. Tap-only — the player
-    // never NEEDS to see this scene to play, so we keep it out of keyboard
-    // focus and hint flow. The dedicatória above gives players who don't
-    // tap a hint that there's more story behind the game.
-    const aboutBtn = this.add.container(width - 18, 18);
+    // SOBRE pill in the top-right corner. Anchor the right edge to the
+    // safe-area-respecting margin so the whole pill is always visible —
+    // older versions used a center anchor and chopped half of it off-screen
+    // on narrow phones.
+    const pillW = 76;
+    const pillH = 30;
+    const pillMargin = 14;
+    const aboutCx = width - pillMargin - pillW / 2;
+    const aboutCy = pillMargin + pillH / 2;
+    const aboutBtn = this.add.container(aboutCx, aboutCy);
     const aboutBg = this.add
-      .rectangle(0, 0, 70, 26, 0x251338, 0.9)
+      .rectangle(0, 0, pillW, pillH, 0x251338, 0.9)
       .setStrokeStyle(2, 0xffcc55, 1);
     const aboutLabel = this.add
       .text(0, 0, t('title.about'), {
         fontFamily: 'monospace',
-        fontSize: '11px',
+        fontSize: '12px',
         color: '#ffe',
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
     aboutBtn.add([aboutBg, aboutLabel]);
-    aboutBtn.setSize(70, 26);
+    aboutBtn.setSize(pillW, pillH);
     aboutBg.setInteractive({ useHandCursor: true });
     aboutBg.on('pointerover', () => {
       aboutBg.setFillStyle(0x36204c, 0.95);
